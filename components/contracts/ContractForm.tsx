@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { useTenantRouter } from "@/components/providers/TenantProvider";
+import { TenantLink } from "@/components/providers/TenantLink";
 import { ArrowLeft } from "lucide-react";
 import { useCRMShell } from "@/components/shell/CRMShellContext";
 import type { Contract, Opportunity } from "@/lib/types";
@@ -112,7 +112,7 @@ function applyTierNotes(
 }
 
 export function ContractForm({ contractId }: { contractId?: string }) {
-  const router = useRouter();
+  const router = useTenantRouter();
   const { contracts, setContracts, opportunities, allocations } = useCRMShell();
   const [c, setC] = useState<Contract | null>(null);
   const [fetchErr, setFetchErr] = useState<string | null>(null);
@@ -266,9 +266,9 @@ export function ContractForm({ contractId }: { contractId?: string }) {
       <div className="p-6 text-sm text-slate-500">
         {contractId ? "Contract not found." : "Loading…"}
         {contractId && (
-          <Link href="/contracts" className="ml-2 text-[#002f93] font-semibold">
+          <TenantLink href="/contracts" className="ml-2 text-[#002f93] font-semibold">
             Back to list
-          </Link>
+          </TenantLink>
         )}
       </div>
     );

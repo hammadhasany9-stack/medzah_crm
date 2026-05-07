@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useTenantRouter } from "@/components/providers/TenantProvider";
 import type { LucideIcon } from "lucide-react";
 import {
   X, Eye, Pencil, Trash2,
@@ -142,7 +142,7 @@ export function LeadDetailPanel({
   onPriorityChange,
 }: LeadDetailPanelProps) {
   const isOpen = !!lead;
-  const router = useRouter();
+  const router = useTenantRouter();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const initials = lead

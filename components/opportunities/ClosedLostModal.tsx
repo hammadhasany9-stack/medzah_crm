@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { X, XCircle, Calendar, ChevronDown } from "lucide-react";
-import { Opportunity } from "@/lib/types";
+import { CLOSED_LOST_REASON_LABELS, type ClosedLostReason, type Opportunity } from "@/lib/types";
 
 // ─── Shared UI primitives ─────────────────────────────────────────────────────
 
@@ -79,18 +79,35 @@ function ReadOnlyField({
 
 export interface ClosedLostModalProps {
   opportunity: Opportunity;
-  onClose: () => void;
+  onConfirm: (payload: { closedLostReason: ClosedLostReason; closedLostDescription: string }) => void;
+  onCancel: () => void;
 }
 
-export function ClosedLostModal({ opportunity, onClose }: ClosedLostModalProps) {
+const CLOSED_LOST_REASON_ORDER: ClosedLostReason[] = [
+  "customer_disapproval_quotation",
+  "customer_no_response",
+  "other",
+];
+
+export function ClosedLostModal({ opportunity, onConfirm, onCancel }: ClosedLostModalProps) {
   const q = opportunity.quoteData;
   const [quoteInfoOpen, setQuoteInfoOpen] = useState(true);
   const [oppInfoOpen, setOppInfoOpen] = useState(true);
+  const [closedLostReason, setClosedLostReason] = useState<ClosedLostReason | null>(null);
+  const [closedLostDescription, setClosedLostDescription] = useState("");
+
+  function handleConfirm() {
+    if (!closedLostReason) return;
+    onConfirm({
+      closedLostReason,
+      closedLostDescription: closedLostDescription.trim(),
+    });
+  }
 
   return (
     <>
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[70]" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[70]" onClick={onCancel} />
 
       {/* Modal */}
       <div className="fixed inset-0 z-[71] flex items-start justify-center overflow-y-auto py-6 px-4">
@@ -102,7 +119,8 @@ export function ClosedLostModal({ opportunity, onClose }: ClosedLostModalProps) 
           <div className="relative flex flex-col items-center pt-8 pb-5 px-5 border-b border-slate-100">
             {/* Close button */}
             <button
-              onClick={onClose}
+              type="button"
+              onClick={onCancel}
               className="absolute top-4 right-4 w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
             >
               <X size={16} />
@@ -123,6 +141,43 @@ export function ClosedLostModal({ opportunity, onClose }: ClosedLostModalProps) 
 
           {/* ── Scrollable Body ── */}
           <div className="overflow-y-auto flex-1 px-5 py-5 space-y-5 max-h-[calc(100vh-200px)]">
+
+            {/* ── Closed lost reason ── */}
+            <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-4 space-y-3">
+              <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                Lost reason<span className="text-red-500"> *</span>
+              </p>
+              <fieldset className="space-y-2">
+                <legend className="sr-only">Select closed lost reason</legend>
+                {CLOSED_LOST_REASON_ORDER.map((value) => (
+                  <label
+                    key={value}
+                    className="flex items-center gap-2.5 cursor-pointer text-[13px] text-slate-800"
+                  >
+                    <input
+                      type="radio"
+                      name="closedLostReason"
+                      className="h-3.5 w-3.5 accent-[#002f93]"
+                      checked={closedLostReason === value}
+                      onChange={() => setClosedLostReason(value)}
+                    />
+                    {CLOSED_LOST_REASON_LABELS[value]}
+                  </label>
+                ))}
+              </fieldset>
+              <div>
+                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">
+                  Additional description
+                </p>
+                <textarea
+                  value={closedLostDescription}
+                  onChange={(e) => setClosedLostDescription(e.target.value)}
+                  placeholder="Optional details…"
+                  rows={3}
+                  className="w-full px-3 py-2.5 text-[13px] border border-slate-200 rounded-lg resize-none bg-white focus:outline-none focus:ring-2 focus:ring-[#002f93] placeholder:text-slate-400 leading-relaxed"
+                />
+              </div>
+            </div>
 
             {/* ── Quote Information ── */}
             <div>
@@ -246,13 +301,21 @@ export function ClosedLostModal({ opportunity, onClose }: ClosedLostModalProps) 
           </div>
 
           {/* ── Footer ── */}
-          <div className="flex-shrink-0 px-5 py-4 border-t border-slate-100 bg-white rounded-b-2xl flex items-center justify-center">
+          <div className="flex-shrink-0 px-5 py-4 border-t border-slate-100 bg-white rounded-b-2xl flex items-center justify-center gap-3">
             <button
               type="button"
-              onClick={onClose}
-              className="px-10 py-2 text-[13px] font-semibold text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+              onClick={onCancel}
+              className="px-8 py-2 text-[13px] font-semibold text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
             >
-              Close
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!closedLostReason}
+              onClick={handleConfirm}
+              className="px-8 py-2 text-[13px] font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-45 disabled:pointer-events-none"
+            >
+              Confirm Closed Lost
             </button>
           </div>
         </div>

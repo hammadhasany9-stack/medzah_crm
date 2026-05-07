@@ -24,6 +24,8 @@ interface AllocationFilterBarProps {
   onDateChange: (range: DateRange, label: string) => void;
   onSearchChange: (v: string) => void;
   onClear: () => void;
+  /** Optional CTA (e.g. Kevin “Create Allocation”). */
+  primaryAction?: { label: string; onClick: () => void };
 }
 
 function Dropdown({
@@ -86,6 +88,7 @@ export function AllocationFilterBar({
   source, owner, priority, dateRange, dateLabel, search,
   recordCount, totalCount,
   onSourceChange, onOwnerChange, onPriorityChange, onDateChange, onSearchChange, onClear,
+  primaryAction,
 }: AllocationFilterBarProps) {
   const hasFilters = !!(source || owner || priority || dateRange.start || search);
 
@@ -122,8 +125,19 @@ export function AllocationFilterBar({
         </button>
       )}
 
-      <div className="ml-auto text-xs text-slate-400 font-medium whitespace-nowrap">
-        {recordCount} of {totalCount} request{totalCount !== 1 ? "s" : ""}
+      <div className="ml-auto flex items-center gap-2">
+        {primaryAction && (
+          <button
+            type="button"
+            onClick={primaryAction.onClick}
+            className="inline-flex items-center px-3 py-1.5 text-sm font-semibold text-white bg-[#002f93] rounded-lg hover:bg-[#001f6b] transition-colors whitespace-nowrap"
+          >
+            {primaryAction.label}
+          </button>
+        )}
+        <span className="text-xs text-slate-400 font-medium whitespace-nowrap">
+          {recordCount} of {totalCount} request{totalCount !== 1 ? "s" : ""}
+        </span>
       </div>
     </div>
   );

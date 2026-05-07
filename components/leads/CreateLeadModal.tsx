@@ -1,8 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import { X, UserCircle2 } from "lucide-react";
-import { Lead, Priority, LeadStatus } from "@/lib/types";
+import { useState, useEffect, useMemo } from "react";
+import { X, UserCircle2, AlertCircle } from "lucide-react";
+import { Lead, Priority, LeadStatus, AllocationCustomerType } from "@/lib/types";
+import type { AccountRecord } from "@/lib/mock-data/accounts";
+import { loadAccounts } from "@/lib/mock-data/accounts";
+import { formatPhoneMobile, loadContacts } from "@/lib/mock-data/contacts";
+import {
+  contactDisplayLabel,
+  contactIdCompatibleWithAccount,
+  contactsForAccountName,
+  validateExistingLeadSelection,
+} from "@/lib/lead-customer-linking";
 
 interface CreateLeadModalProps {
   sourceLabel: string;
@@ -56,6 +65,12 @@ function SelectWrap({ children }: { children: React.ReactNode }) {
 
 export function CreateLeadModal({ sourceLabel, sourceBadgeColor, onSave, onCancel }: CreateLeadModalProps) {
   const [attempted, setAttempted] = useState(false);
+  const [existingError, setExistingError] = useState<string | null>(null);
+
+  const [leadCustomerType, setLeadCustomerType] = useState<AllocationCustomerType>("new");
+  const [accounts, setAccounts] = useState<AccountRecord[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState("");
+  const [selectedContactId, setSelectedContactId] = useState("");
 
   const [leadOwner,      setLeadOwner]      = useState("Katie Allen");
   const [customerFor,    setCustomerFor]    = useState("None");
@@ -81,48 +96,141 @@ export function CreateLeadModal({ sourceLabel, sourceBadgeColor, onSave, onCance
   const [attn,           setAttn]           = useState("");
   const [description,    setDescription]    = useState("");
 
-  const nameError = attempted && firstName.trim() === "" && lastName.trim() === "";
+  useEffect(() => {
+    setAccounts(loadAccounts().slice().sort((a, b) => a.name.localeCompare(b.name)));
+  }, []);
+
+  const allContacts = useMemo(() => loadContacts(), []);
+
+  const selectedAccountRecord = accounts.find((a) => a.id === selectedAccountId);
+
+  const contactOptions = useMemo(() => {
+    if (!selectedAccountId || !selectedAccountRecord) return allContacts;
+    return contactsForAccountName(selectedAccountRecord.name, allContacts);
+  }, [selectedAccountId, selectedAccountRecord, allContacts]);
+
+  const nameError = attempted && leadCustomerType === "new" && firstName.trim() === "" && lastName.trim() === "";
+
+  function handleAccountChange(accountId: string) {
+    setSelectedAccountId(accountId);
+    const acc = accounts.find((a) => a.id === accountId);
+    if (!contactIdCompatibleWithAccount(selectedContactId, acc, allContacts)) {
+      setSelectedContactId("");
+    }
+  }
+
+  function handleContactChange(contactId: string) {
+    setSelectedContactId(contactId);
+    const c = allContacts.find((x) => x.id === contactId);
+    if (!c) return;
+    const match = accounts.find((a) => a.name === c.accountName);
+    if (match) setSelectedAccountId(match.id);
+  }
+
+  function handleLeadCustomerTypeChange(next: AllocationCustomerType) {
+    setLeadCustomerType(next);
+    if (next === "new") {
+      setSelectedAccountId("");
+      setSelectedContactId("");
+      setExistingError(null);
+    }
+  }
 
   function handleSave() {
     setAttempted(true);
-    if (firstName.trim() === "" && lastName.trim() === "") return;
+    setExistingError(null);
 
-    const lead: Lead = {
-      id:               `lead-${uid()}`,
-      leadRef:          leadId(),
-      title:            `${company || firstName} – New Lead`,
-      status:           leadStatus,
-      urgency:          "Medium",
-      priority:         leadPriority,
-      contactName:      `${firstName} ${lastName}`.trim(),
-      companyName:      company,
-      assignedTo:       leadOwner,
-      email,
-      phone,
-      leadSource:       sourceLabel,
-      customerFor:      customerFor === "None" ? undefined : customerFor,
-      contactTitle:     title,
-      location:         [city, state, country].filter(Boolean).join(", "),
-      validTill:        "",
-      expectedRevenue:  "",
-      grandTotal:       "",
-      subject:          "",
+    let existingValidated: Extract<
+      ReturnType<typeof validateExistingLeadSelection>,
+      { ok: true }
+    > | null = null;
+
+    if (leadCustomerType === "new") {
+      if (firstName.trim() === "" && lastName.trim() === "") return;
+    } else {
+      const v = validateExistingLeadSelection(
+        selectedAccountId,
+        selectedContactId,
+        accounts,
+        allContacts
+      );
+      if (!v.ok) {
+        setExistingError(v.message);
+        return;
+      }
+      existingValidated = v;
+    }
+
+    const createdDate = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    const activities: Lead["activities"] = [{
+      id:          `act-${uid()}`,
+      type:        "created",
+      title:       "Lead Created",
+      description: `Source: ${sourceLabel}`,
+      timestamp:   "TODAY",
+    }];
+
+    const shared = {
+      id:              `lead-${uid()}`,
+      leadRef:         leadId(),
+      status:          leadStatus,
+      urgency:         "Medium" as const,
+      priority:        leadPriority,
+      assignedTo:      leadOwner,
+      leadSource:      sourceLabel,
+      customerFor:     customerFor === "None" ? undefined : customerFor,
+      validTill:       "",
+      expectedRevenue: "",
+      grandTotal:      "",
+      subject:         "",
       opportunityOwner: leadOwner,
-      accountName:      company,
-      pipeline:         "Sales Pipeline",
-      businessType:     "B2B",
-      skusQuantity:     "",
-      shippingMethod:   "",
-      createdDate:      new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-      note:             description,
-      activities: [{
-        id:          `act-${uid()}`,
-        type:        "created",
-        title:       "Lead Created",
-        description: `Source: ${sourceLabel}`,
-        timestamp:   "TODAY",
-      }],
+      pipeline:        "Sales Pipeline",
+      businessType:    "B2B",
+      skusQuantity:    "",
+      shippingMethod:  "",
+      createdDate,
+      note:            description,
+      activities,
     };
+
+    let lead: Lead;
+
+    if (leadCustomerType === "new") {
+      lead = {
+        ...shared,
+        title:        `${company || firstName} – New Lead`,
+        contactName:  `${firstName} ${lastName}`.trim(),
+        companyName:  company,
+        email,
+        phone,
+        contactTitle: title,
+        location:     [city, state, country].filter(Boolean).join(", "),
+        customerType: "new",
+        accountName:  company,
+      };
+    } else {
+      if (!existingValidated) return;
+      const { contact, account } = existingValidated;
+      const displayName = `${contact.firstName} ${contact.lastName}`.trim();
+      const phoneLine = formatPhoneMobile(contact) || contact.phone || contact.mobile || "";
+      const loc = [contact.mailingCity, contact.mailingState, contact.mailingCountry]
+        .filter(Boolean)
+        .join(", ");
+      lead = {
+        ...shared,
+        title:           `${account.name} – New Lead`,
+        contactName:     displayName,
+        companyName:     account.name,
+        email:           contact.email,
+        phone:           phoneLine,
+        contactTitle:    contact.title,
+        location:        loc || [city, state, country].filter(Boolean).join(", "),
+        customerType:    "existing",
+        linkedAccountId: account.id,
+        linkedContactId: contact.id,
+        accountName:     account.name,
+      };
+    }
     onSave(lead);
   }
 
@@ -199,49 +307,111 @@ export function CreateLeadModal({ sourceLabel, sourceBadgeColor, onSave, onCance
           {/* CUSTOMER DETAILS */}
           <div className="border-t border-slate-100 pt-5">
             <SectionLabel>Customer Details</SectionLabel>
-            {nameError && <p className="text-xs text-red-500 mb-3">First name or last name is required.</p>}
-            <div className="grid grid-cols-2 gap-x-5 gap-y-4">
-              <Field label="First Name" required>
-                <input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" className={`${inputCls} ${nameError ? "border-red-300" : ""}`} autoFocus />
-              </Field>
-              <Field label="Title">
-                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Job title" className={inputCls} />
-              </Field>
-              <Field label="Last Name" required>
-                <input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" className={`${inputCls} ${nameError ? "border-red-300" : ""}`} />
-              </Field>
-              <Field label="Company">
-                <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Company name" className={inputCls} />
-              </Field>
-              <Field label="Phone">
-                <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+1 (555) 000-0000" className={inputCls} />
-              </Field>
-              <Field label="Email">
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@company.com" className={inputCls} />
-              </Field>
-              <Field label="Mobile">
-                <input value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="+1 (555) 000-0000" className={inputCls} />
-              </Field>
-              <Field label="Website">
-                <input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://example.com" className={inputCls} />
-              </Field>
-              <Field label="Industry">
+            <div className="grid grid-cols-2 gap-x-5 gap-y-4 mb-4">
+              <Field label="Customer type">
                 <SelectWrap>
-                  <select value={industry} onChange={(e) => setIndustry(e.target.value)} className={selectCls}>
-                    {INDUSTRIES.map((i) => <option key={i}>{i}</option>)}
+                  <select
+                    value={leadCustomerType}
+                    onChange={(e) => handleLeadCustomerTypeChange(e.target.value as AllocationCustomerType)}
+                    className={selectCls}
+                  >
+                    <option value="new">New</option>
+                    <option value="existing">Existing</option>
                   </select>
                 </SelectWrap>
               </Field>
-              <Field label="Premier Rep">
-                <input value={premierRep} onChange={(e) => setPremierRep(e.target.value)} placeholder="Rep name" className={inputCls} />
-              </Field>
-              <Field label="Premier Rep Email">
-                <input type="email" value={premierRepEmail} onChange={(e) => setPremierRepEmail(e.target.value)} placeholder="rep@example.com" className={inputCls} />
-              </Field>
-              <Field label="Premier Rep Phone">
-                <input value={premierRepPhone} onChange={(e) => setPremierRepPhone(e.target.value)} placeholder="+1 (555) 000-0000" className={inputCls} />
-              </Field>
             </div>
+
+            {leadCustomerType === "existing" && (
+              <>
+                {attempted && existingError && (
+                  <div className="flex items-center gap-1.5 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">
+                    <AlertCircle size={13} className="flex-shrink-0" />
+                    {existingError}
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-x-5 gap-y-4 mb-4">
+                  <Field label="Account" required>
+                    <SelectWrap>
+                      <select
+                        value={selectedAccountId}
+                        onChange={(e) => handleAccountChange(e.target.value)}
+                        className={selectCls}
+                      >
+                        <option value="">Select account…</option>
+                        {accounts.map((a) => (
+                          <option key={a.id} value={a.id}>{a.name}</option>
+                        ))}
+                      </select>
+                    </SelectWrap>
+                  </Field>
+                  <Field label="Contact" required>
+                    <SelectWrap>
+                      <select
+                        value={selectedContactId}
+                        onChange={(e) => handleContactChange(e.target.value)}
+                        className={selectCls}
+                      >
+                        <option value="">
+                          {selectedAccountId ? "Select contact…" : "Select contact (or pick account first)…"}
+                        </option>
+                        {contactOptions.map((c) => (
+                          <option key={c.id} value={c.id}>{contactDisplayLabel(c)}</option>
+                        ))}
+                      </select>
+                    </SelectWrap>
+                  </Field>
+                </div>
+              </>
+            )}
+
+            {leadCustomerType === "new" && (
+              <>
+                {nameError && <p className="text-xs text-red-500 mb-3">First name or last name is required.</p>}
+                <div className="grid grid-cols-2 gap-x-5 gap-y-4">
+                  <Field label="First Name" required>
+                    <input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" className={`${inputCls} ${nameError ? "border-red-300" : ""}`} autoFocus />
+                  </Field>
+                  <Field label="Title">
+                    <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Job title" className={inputCls} />
+                  </Field>
+                  <Field label="Last Name" required>
+                    <input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" className={`${inputCls} ${nameError ? "border-red-300" : ""}`} />
+                  </Field>
+                  <Field label="Company">
+                    <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Company name" className={inputCls} />
+                  </Field>
+                  <Field label="Phone">
+                    <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+1 (555) 000-0000" className={inputCls} />
+                  </Field>
+                  <Field label="Email">
+                    <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@company.com" className={inputCls} />
+                  </Field>
+                  <Field label="Mobile">
+                    <input value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="+1 (555) 000-0000" className={inputCls} />
+                  </Field>
+                  <Field label="Website">
+                    <input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://example.com" className={inputCls} />
+                  </Field>
+                  <Field label="Industry">
+                    <SelectWrap>
+                      <select value={industry} onChange={(e) => setIndustry(e.target.value)} className={selectCls}>
+                        {INDUSTRIES.map((i) => <option key={i}>{i}</option>)}
+                      </select>
+                    </SelectWrap>
+                  </Field>
+                  <Field label="Premier Rep">
+                    <input value={premierRep} onChange={(e) => setPremierRep(e.target.value)} placeholder="Rep name" className={inputCls} />
+                  </Field>
+                  <Field label="Premier Rep Email">
+                    <input type="email" value={premierRepEmail} onChange={(e) => setPremierRepEmail(e.target.value)} placeholder="rep@example.com" className={inputCls} />
+                  </Field>
+                  <Field label="Premier Rep Phone">
+                    <input value={premierRepPhone} onChange={(e) => setPremierRepPhone(e.target.value)} placeholder="+1 (555) 000-0000" className={inputCls} />
+                  </Field>
+                </div>
+              </>
+            )}
           </div>
 
           {/* CUSTOMER BILLING DETAILS */}

@@ -1,5 +1,10 @@
 import ExcelJS from "exceljs";
-import type { AllocationProduct, AllocationRecord, AllocationRecordStatus } from "@/lib/types";
+import type {
+  AllocationProduct,
+  AllocationRecord,
+  AllocationRecordStatus,
+} from "@/lib/types";
+import { committedQuantity } from "@/lib/allocation-committed-qty";
 import { mockProducts } from "@/lib/mock-data/products";
 
 const HEADERS = [
@@ -48,13 +53,6 @@ function parseConvFromInventory(p: AllocationProduct): number {
     return catalog.uomConversions[0].factor;
   }
   return 1;
-}
-
-function sumQuantity(p: AllocationProduct, status: AllocationRecordStatus): number {
-  if (status === "Partially Approved") {
-    return Math.min(p.requiredQty, Math.max(0, p.inventory.qtyAvailable));
-  }
-  return p.requiredQty;
 }
 
 /** Deterministic cross-ref similar to SAM-2000 style in sample sheets */
@@ -106,7 +104,7 @@ export async function downloadAllocationXlsx(record: AllocationRecord): Promise<
       p.productName,
       pkgUom(p.inventory.uom),
       parseConvFromInventory(p),
-      sumQuantity(p, record.status),
+      committedQuantity(p, record.status),
       medzahCross(p.sku, idx),
     ]);
     row.eachCell((cell, colNumber) => {

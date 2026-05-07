@@ -1,5 +1,9 @@
-"use client";
+﻿"use client";
 
+import {
+  useTenant,
+  useTenantPath,
+} from "@/components/providers/TenantProvider";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -21,9 +25,12 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const salesLinks = [
+const leadLinks = [
   { href: "/leads", label: "Leads", icon: Target },
   { href: "/opportunity", label: "Opportunity", icon: TrendingUp },
+];
+
+const sharedSalesLinks = [
   { href: "/quotes", label: "Quotes", icon: FileText },
   { href: "/sales-orders", label: "Sales Orders", icon: ShoppingCart },
 ];
@@ -67,10 +74,44 @@ function NavItem({
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { tenant } = useTenant();
+  const t = useTenantPath();
+
+  const dash = t("/dashboard");
+  const settingsHref = t("/settings");
+  const inboxHref = t("/inbox");
+
+  const salesLinks =
+    tenant === "kevin" ? [...leadLinks, ...sharedSalesLinks] : sharedSalesLinks;
+
+  const profile =
+    tenant === "kevin"
+      ? { initials: "KC", name: "Kevin Calamari", title: "Sales Director" }
+      : { initials: "A", name: "Amanda", title: "Operations" };
+
+  const customerNavLinks =
+    tenant === "amanda"
+      ? customerLinks.map((link) =>
+          link.href === "/customer-intake"
+            ? { ...link, href: "/customer-intake/approval" }
+            : link.href === "/contracts"
+              ? { ...link, href: "/contracts/approval" }
+              : link
+        )
+      : customerLinks;
+
+  function segmentActive(href: string) {
+    const full = t(href);
+    return pathname === full || pathname.startsWith(full + "/");
+  }
+
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/login";
+  }
 
   return (
     <aside className="fixed inset-y-0 left-0 w-64 bg-[#0F172A] flex flex-col z-30 print:hidden">
-      {/* Logo */}
       <div className="px-5 py-5 border-b border-white/5">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-[#002f93] flex items-center justify-center">
@@ -85,19 +126,16 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-5">
-        {/* Dashboard */}
         <div>
           <NavItem
-            href="/dashboard"
+            href={dash}
             label="Dashboard"
             icon={LayoutDashboard}
-            active={pathname === "/dashboard"}
+            active={segmentActive("/dashboard")}
           />
         </div>
 
-        {/* Sales */}
         <div>
           <p className="px-3 mb-1.5 text-xs font-semibold uppercase tracking-widest text-slate-600">
             Sales
@@ -106,52 +144,66 @@ export function Sidebar() {
             {salesLinks.map((link) => (
               <NavItem
                 key={link.href}
-                href={link.href}
+                href={t(link.href)}
                 label={link.label}
                 icon={link.icon}
-                active={pathname === link.href || pathname.startsWith(link.href + "/")}
+                active={segmentActive(link.href)}
               />
             ))}
           </div>
         </div>
 
-        {/* Customer */}
         <div>
           <p className="px-3 mb-1.5 text-xs font-semibold uppercase tracking-widest text-slate-600">
             Customer
           </p>
           <div className="space-y-0.5">
-            {customerLinks.map((link) => (
+            {customerNavLinks.map((link) => (
               <NavItem
                 key={link.href}
-                href={link.href}
+                href={t(link.href)}
                 label={link.label}
                 icon={link.icon}
-                active={pathname === link.href || pathname.startsWith(link.href + "/")}
+                active={segmentActive(link.href)}
               />
             ))}
           </div>
         </div>
       </nav>
 
-      {/* User Profile */}
       <div className="border-t border-white/5">
         <div className="mx-3 my-3 bg-[#1E293B] rounded-xl p-3">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-[#002f93] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-              KC
+              {profile.initials}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-white truncate">Kevin Calamari</p>
-              <p className="text-xs text-slate-400 truncate">Sales Director</p>
+              <p className="text-sm font-semibold text-white truncate">{profile.name}</p>
+              <p className="text-xs text-slate-400 truncate">{profile.title}</p>
             </div>
           </div>
         </div>
 
         <div className="px-3 pb-3 space-y-0.5">
-          <NavItem href="/settings" label="Settings" icon={Settings} active={pathname === "/settings"} />
-          <NavItem href="/inbox" label="Sales Inbox" icon={Inbox} active={pathname === "/inbox"} />
-          <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-400 hover:bg-white/5 hover:text-red-400 rounded-lg transition-all duration-150 border-l-2 border-transparent pl-[10px]">
+          <NavItem
+            href={settingsHref}
+            label="Settings"
+            icon={Settings}
+            active={segmentActive("/settings")}
+          />
+          {tenant === "kevin" ? (
+            <NavItem
+              href={inboxHref}
+              label="Sales Inbox"
+              icon={Inbox}
+              active={segmentActive("/inbox")}
+            />
+          ) : null}
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-400 hover:bg-white/5 hover:text-red-400 rounded-lg transition-all duration-150 border-l-2 border-transparent pl-[10px]"
+          >
             <LogOut size={16} />
             <span>Logout</span>
           </button>

@@ -1,12 +1,15 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import {
   X, Trash2,
   Calendar, DollarSign, Clock, CheckCircle2,
-  XCircle, FilePlus, FilePenLine,
+  XCircle, FilePlus, FilePenLine, PackageSearch,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { Opportunity, QuoteStatus } from "@/lib/types";
+import { useTenantRouter } from "@/components/providers/TenantProvider";
+import { Opportunity } from "@/lib/types";
+import { useCRMShell } from "@/components/shell/CRMShellContext";
+import { ViewAllocationModal } from "@/components/leads/ViewAllocationModal";
 
 // ─── Shared badge components ──────────────────────────────────────────────────
 
@@ -72,14 +75,26 @@ export function QuoteSidePanel({
   onAdjust,
   onReject,
 }: QuoteSidePanelProps) {
-  const router = useRouter();
+  const router = useTenantRouter();
+  const { allocations } = useCRMShell();
+  const [showAllocModal, setShowAllocModal] = useState(false);
   const isOpen = !!opportunity;
   const quoteData = opportunity?.quoteData;
+
+  const allocationRecord = opportunity?.allocationId
+    ? allocations.find((a) => a.id === opportunity.allocationId) ?? null
+    : null;
+  const hasAllocation = !!(opportunity?.procurementAllocation || allocationRecord);
 
   const isPending  = opportunity?.quoteStatus === "pending";
   const isApproved = opportunity?.quoteStatus === "approved";
   const isRejected = opportunity?.quoteStatus === "rejected";
+  const isApprovedWithAdj = !!(isApproved && opportunity?.quoteAdjusted);
   const showQuoteRevised = !!(isPending && opportunity?.quoteRevised);
+
+  useEffect(() => {
+    if (!opportunity) setShowAllocModal(false);
+  }, [opportunity]);
 
   // Format valid date
   const validDisplay = (() => {
@@ -129,7 +144,7 @@ export function QuoteSidePanel({
               <div className="flex items-center gap-1.5 flex-wrap">
                 <UrgencyBadge urgency={quoteData.urgency} />
                 {showQuoteRevised && <QuoteRevisedBadge />}
-                <AllocationBadge />
+                {hasAllocation && <AllocationBadge />}
               </div>
 
               {/* Title */}
@@ -159,8 +174,14 @@ export function QuoteSidePanel({
                 >
                   View Quote
                 </button>
-                {opportunity.procurementAllocation && (
-                  <button className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-[12px] font-semibold rounded-lg border border-[#002f93]/20 text-[#002f93] hover:bg-[#002f93]/5 transition-colors">
+                {hasAllocation && (
+                  <button
+                    type="button"
+                    onClick={() => allocationRecord && setShowAllocModal(true)}
+                    disabled={!allocationRecord}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-[12px] font-semibold rounded-lg border border-[#002f93]/20 text-[#002f93] hover:bg-[#002f93]/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <PackageSearch size={12} />
                     View Allocation
                   </button>
                 )}
@@ -181,10 +202,12 @@ export function QuoteSidePanel({
                     </span>
                   </div>
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1">Grand Total</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1">
+                      {quoteData.finalQuoteTotal?.trim() ? "Final Quote Total" : "Grand Total"}
+                    </p>
                     <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-slate-900">
                       <DollarSign size={13} className="text-slate-400 flex-shrink-0" />
-                      {quoteData.grandTotal}
+                      {quoteData.finalQuoteTotal?.trim() || quoteData.grandTotal}
                     </span>
                   </div>
                 </div>
@@ -202,7 +225,16 @@ export function QuoteSidePanel({
                     </div>
                   </div>
                 )}
-                {isApproved && (
+                {isApproved && isApprovedWithAdj && (
+                  <div className="flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-xl px-3.5 py-2.5">
+                    <CheckCircle2 size={14} className="text-teal-600 flex-shrink-0" />
+                    <div>
+                      <p className="text-[12px] font-bold text-teal-800">Approved with adjustments</p>
+                      <p className="text-[11px] text-teal-700 mt-0.5">Quote was adjusted and approved.</p>
+                    </div>
+                  </div>
+                )}
+                {isApproved && !isApprovedWithAdj && (
                   <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3.5 py-2.5">
                     <CheckCircle2 size={14} className="text-emerald-500 flex-shrink-0" />
                     <div>
@@ -226,6 +258,14 @@ export function QuoteSidePanel({
                       <FilePlus size={12} />
                       Create New Quote
                     </button>
+                  </div>
+                )}
+                {opportunity.quoteDecisionBy?.trim() && (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-0.5">
+                      Action by
+                    </p>
+                    <p className="text-[12px] font-semibold text-slate-800">{opportunity.quoteDecisionBy}</p>
                   </div>
                 )}
               </section>
@@ -324,6 +364,13 @@ export function QuoteSidePanel({
           </>
         )}
       </aside>
+
+      {showAllocModal && allocationRecord && (
+        <ViewAllocationModal
+          allocation={allocationRecord}
+          onClose={() => setShowAllocModal(false)}
+        />
+      )}
     </>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useTenantRouter } from "@/components/providers/TenantProvider";
 import {
   DndContext,
   DragEndEvent,
@@ -15,7 +15,7 @@ import {
 } from "@dnd-kit/core";
 import { useDraggable } from "@dnd-kit/core";
 import { Inbox, X } from "lucide-react";
-import { Opportunity, OpportunityStage, QuoteData, QuoteRecord } from "@/lib/types";
+import { Opportunity, OpportunityStage, QuoteData, QuoteRecord, type ClosedLostReason } from "@/lib/types";
 import { isAdvanceBlockedWithoutApprovedQuote } from "@/lib/opportunity-stage-guards";
 import { QuoteApprovalRequiredDialog } from "@/components/opportunities/QuoteApprovalRequiredDialog";
 
@@ -176,7 +176,7 @@ export function OpportunityKanbanBoard({
   onCardClick,
   onOpportunitiesChange,
 }: OpportunityKanbanBoardProps) {
-  const router = useRouter();
+  const router = useTenantRouter();
   const [opportunities, setOpportunities] = useState<Opportunity[]>(initialOpportunities);
   const [activeId, setActiveId] = useState<string | null>(null);
 
@@ -327,9 +327,15 @@ export function OpportunityKanbanBoard({
     setPendingClosedWonMove(null);
   }
 
-  function handleClosedLostClose() {
+  function handleClosedLostConfirm(payload: {
+    closedLostReason: ClosedLostReason;
+    closedLostDescription: string;
+  }) {
     if (!pendingClosedLostMove) return;
-    applyMove(pendingClosedLostMove.oppId, "Closed Lost");
+    applyMove(pendingClosedLostMove.oppId, "Closed Lost", {
+      closedLostReason: payload.closedLostReason,
+      closedLostDescription: payload.closedLostDescription || undefined,
+    });
     setPendingClosedLostMove(null);
   }
 
@@ -454,7 +460,8 @@ export function OpportunityKanbanBoard({
       {pendingClosedLostOpp && (
         <ClosedLostModal
           opportunity={pendingClosedLostOpp}
-          onClose={handleClosedLostClose}
+          onConfirm={handleClosedLostConfirm}
+          onCancel={handleClosedLostCancel}
         />
       )}
 

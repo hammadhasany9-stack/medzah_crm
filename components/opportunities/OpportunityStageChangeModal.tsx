@@ -6,6 +6,7 @@ import { Opportunity, QuoteData, QuoteItem, ProcurementAllocation } from "@/lib/
 import type { ProductCatalogItem } from "@/lib/mock-data/products";
 import { QuoteProductNamePicker } from "@/components/quotes/QuoteProductNamePicker";
 import { useCRMShell } from "@/components/shell/CRMShellContext";
+import { useTenant } from "@/components/providers/TenantProvider";
 import { AllocationRecordDetailContent } from "@/components/leads/ViewAllocationModal";
 import * as XLSX from "xlsx";
 import {
@@ -14,8 +15,20 @@ import {
   type AccountRecord,
 } from "@/lib/mock-data/accounts";
 import { getContactDisplayNamesForQuotePicker } from "@/lib/mock-data/contacts";
+import {
+  computeQuoteFeeAmounts,
+  parseMoneyAmount,
+  OVERHEAD_INFRASTRUCTURE_PERCENT,
+} from "@/lib/quote-pricing";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const PAYMENT_TERMS_OPTIONS = ["Net 30", "Net 60", "Prepaid"] as const;
+const EXPECTED_DEMAND_OPTIONS = ["Volume forecast", "Estimated usage"] as const;
+const DELIVERY_LOCATIONS_OPTIONS = ["Single site", "Multi-site"] as const;
+const FREIGHT_RESPONSIBILITY_OPTIONS = ["Customer pays freight", "We cover freight"] as const;
+const DELIVERY_CHARGES_OPTIONS = ["Applicable", "Waived"] as const;
+const CARRIER_BILLING_OPTIONS = ["Our account (FedEx/UPS)", "Customer shipping account"] as const;
 
 function generateId() {
   return Math.random().toString(36).slice(2, 9);
@@ -48,14 +61,18 @@ function Label({ children, required }: { children: React.ReactNode; required?: b
 }
 
 function Input({
-  value, onChange, placeholder, required, error, type = "text",
+  value, onChange, placeholder, required, error, type = "text", min, step,
 }: {
   value: string; onChange: (v: string) => void; placeholder?: string;
   required?: boolean; error?: boolean; type?: string;
+  min?: number | string;
+  step?: number | string;
 }) {
   return (
     <input
       type={type}
+      min={min}
+      step={step}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
@@ -683,12 +700,31 @@ function XlsUploadZone({
 // ─── Totals row ────────────────────────────────────────────────────────────────
 
 function TotalsSection({
-  items, discount, tax, adjustment, grandTotal,
-  onDiscount, onTax, onAdjustment,
+  items,
+  discount,
+  tax,
+  adjustment,
+  grandTotal,
+  onDiscount,
+  onTax,
+  onAdjustment,
+  salesCommissionPercent,
+  onSalesCommissionPercent,
+  submitted,
+  errors,
 }: {
   items: QuoteItem[];
-  discount: string; tax: string; adjustment: string; grandTotal: string;
-  onDiscount: (v: string) => void; onTax: (v: string) => void; onAdjustment: (v: string) => void;
+  discount: string;
+  tax: string;
+  adjustment: string;
+  grandTotal: string;
+  onDiscount: (v: string) => void;
+  onTax: (v: string) => void;
+  onAdjustment: (v: string) => void;
+  salesCommissionPercent: string;
+  onSalesCommissionPercent: (v: string) => void;
+  submitted: boolean;
+  errors: Record<string, boolean>;
 }) {
   const subtotal = items.reduce((sum, it) => {
     const qty = parseFloat(it.quantity) || 0;
@@ -696,17 +732,59 @@ function TotalsSection({
     return sum + qty * price;
   }, 0);
 
+  const productGtNum = parseMoneyAmount(grandTotal);
+  const overheadAmt = productGtNum * (OVERHEAD_INFRASTRUCTURE_PERCENT / 100);
+  const commPctRaw = parseFloat(String(salesCommissionPercent).replace(/[^0-9.-]/g, ""));
+  const commPctSafe = Number.isFinite(commPctRaw) ? commPctRaw : 0;
+  const commissionAmt = productGtNum * (commPctSafe / 100);
+  const finalQuoteTotal = productGtNum + overheadAmt + commissionAmt;
+
+  const commErr = submitted && errors["salesCommissionPercent"];
+
   return (
     <div className="flex justify-end mt-3">
-      <div className="w-64 space-y-1.5">
+      <div className="w-full max-w-sm space-y-1.5">
         <TotalRow label="Subtotal" value={`$${subtotal.toFixed(2)}`} />
         <TotalRow label="Discount" value={discount} editable onEdit={onDiscount} />
         <TotalRow label="Tax" value={tax} editable onEdit={onTax} />
         <TotalRow label="Adjustment" value={adjustment} editable onEdit={onAdjustment} />
         <div className="border-t border-slate-200 pt-1.5">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center gap-3">
             <span className="text-[12px] font-bold text-slate-700">Grand Total</span>
             <span className="text-[14px] font-bold text-slate-900">${grandTotal}</span>
+          </div>
+        </div>
+
+        <div className="border-t border-slate-300 pt-2 mt-2 space-y-2">
+          <div className="flex justify-between items-center gap-3">
+            <span className="text-[11px] text-slate-600 leading-snug">
+              Overhead ({OVERHEAD_INFRASTRUCTURE_PERCENT}% infrastructure markup)
+            </span>
+            <span className="text-[12px] font-semibold text-slate-800 tabular-nums">${overheadAmt.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between items-start gap-3">
+            <span className="text-[11px] text-slate-600 pt-1.5">Sales commission</span>
+            <div className="flex flex-col items-end gap-1">
+              <div className="flex items-center gap-1">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={salesCommissionPercent}
+                  onChange={(e) => onSalesCommissionPercent(e.target.value)}
+                  placeholder="0"
+                  className={`w-16 px-2 py-1 text-[12px] text-right border rounded focus:outline-none focus:ring-1 focus:ring-[#002f93]/30 tabular-nums
+                    ${commErr ? "border-red-400 bg-red-50" : "border-slate-200 bg-slate-50"}`}
+                />
+                <span className="text-[11px] text-slate-500">%</span>
+                <span className="text-[12px] font-semibold text-slate-800 tabular-nums ml-1 min-w-[4.5rem] text-right">
+                  ${commissionAmt.toFixed(2)}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="border-t border-slate-200 pt-1.5 flex justify-between items-center gap-3">
+            <span className="text-[12px] font-bold text-slate-800">Final Quote Total</span>
+            <span className="text-[15px] font-bold text-[#002f93] tabular-nums">${finalQuoteTotal.toFixed(2)}</span>
           </div>
         </div>
       </div>
@@ -766,6 +844,7 @@ export interface OpportunityStageChangeModalProps {
 type ProposalModalDetailTab = "quote" | "allocation";
 
 export function OpportunityStageChangeModal({ opportunity, onSave, onCancel }: OpportunityStageChangeModalProps) {
+  const { tenant } = useTenant();
   const { allocations } = useCRMShell();
   const allocationRecord = opportunity.allocationId
     ? allocations.find((a) => a.id === opportunity.allocationId) ?? null
@@ -845,6 +924,21 @@ export function OpportunityStageChangeModal({ opportunity, onSave, onCancel }: O
   const [tax, setTax] = useState(q?.tax ?? "");
   const [adjustment, setAdjustment] = useState(q?.adjustment ?? "");
 
+  const [paymentTerms, setPaymentTerms] = useState(q?.paymentTerms ?? "");
+  const [expectedDemand, setExpectedDemand] = useState(q?.expectedDemand ?? "");
+  const [deliveryLocations, setDeliveryLocations] = useState(q?.deliveryLocations ?? "");
+  const [deliveryLocationCount, setDeliveryLocationCount] = useState(q?.deliveryLocationCount ?? "");
+  const [firstOrderDeliveryDate, setFirstOrderDeliveryDate] = useState(
+    q?.firstOrderDeliveryDate?.split("T")[0] ?? ""
+  );
+  const [freightResponsibility, setFreightResponsibility] = useState(q?.freightResponsibility ?? "");
+  const [deliveryCharges, setDeliveryCharges] = useState(q?.deliveryCharges ?? "");
+  const [carrierBillingMethod, setCarrierBillingMethod] = useState(q?.carrierBillingMethod ?? "");
+  const [customerShippingAccountNumber, setCustomerShippingAccountNumber] = useState(
+    q?.customerShippingAccountNumber ?? ""
+  );
+  const [salesCommissionPercent, setSalesCommissionPercent] = useState(q?.salesCommissionPercent ?? "");
+
   // Footer
   const [description, setDescription] = useState(q?.description ?? "");
   const [followUpDate, setFollowUpDate] = useState(q?.followUpDate ?? "");
@@ -905,6 +999,27 @@ export function OpportunityStageChangeModal({ opportunity, onSave, onCancel }: O
     });
     if (!hasValidItem) errs["items"] = true;
 
+    if (!paymentTerms.trim()) errs["paymentTerms"] = true;
+    if (!expectedDemand.trim()) errs["expectedDemand"] = true;
+    if (!deliveryLocations.trim()) errs["deliveryLocations"] = true;
+    if (!firstOrderDeliveryDate.trim()) errs["firstOrderDeliveryDate"] = true;
+    if (!freightResponsibility.trim()) errs["freightResponsibility"] = true;
+    if (!deliveryCharges.trim()) errs["deliveryCharges"] = true;
+    if (!carrierBillingMethod.trim()) errs["carrierBillingMethod"] = true;
+
+    if (deliveryLocations === "Multi-site") {
+      const n = parseInt(deliveryLocationCount.trim(), 10);
+      if (!deliveryLocationCount.trim() || !Number.isFinite(n) || n < 1) errs["deliveryLocationCount"] = true;
+    }
+
+    if (carrierBillingMethod === "Customer shipping account") {
+      if (!customerShippingAccountNumber.trim()) errs["customerShippingAccountNumber"] = true;
+    }
+
+    const commStr = salesCommissionPercent.trim();
+    const commNum = parseFloat(commStr.replace(/[^0-9.-]/g, ""));
+    if (!commStr || !Number.isFinite(commNum) || commNum < 0) errs["salesCommissionPercent"] = true;
+
     setErrors(errs);
     return Object.keys(errs).length === 0;
   }
@@ -912,6 +1027,8 @@ export function OpportunityStageChangeModal({ opportunity, onSave, onCancel }: O
   function handleSubmit() {
     setSubmitted(true);
     if (!validate()) return;
+
+    const feeCalc = computeQuoteFeeAmounts(grandTotal, salesCommissionPercent);
 
     const quoteData: QuoteData = {
       subject, accountName, businessType, urgency,
@@ -926,6 +1043,23 @@ export function OpportunityStageChangeModal({ opportunity, onSave, onCancel }: O
         return s + qty * price;
       }, 0).toFixed(2),
       discount, tax, adjustment, grandTotal,
+      paymentTerms,
+      expectedDemand,
+      deliveryLocations,
+      deliveryLocationCount,
+      firstOrderDeliveryDate: firstOrderDeliveryDate
+        ? `${firstOrderDeliveryDate}T12:00:00.000Z`
+        : "",
+      freightResponsibility,
+      deliveryCharges,
+      carrierBillingMethod,
+      customerShippingAccountNumber,
+      overheadInfrastructurePercent: feeCalc.overheadInfrastructurePercent,
+      salesCommissionPercent,
+      freightCostAmount: "0",
+      overheadAmount: feeCalc.overheadAmount,
+      salesCommissionAmount: feeCalc.salesCommissionAmount,
+      finalQuoteTotal: feeCalc.finalQuoteTotal,
       termsAndConditions: "", description, followUpDate,
       teamForApproval: TEAM_MEMBERS,
     };
@@ -1043,6 +1177,125 @@ export function OpportunityStageChangeModal({ opportunity, onSave, onCancel }: O
                     error={submitted && errors["urgency"]}
                   />
                 </div>
+              </div>
+            </div>
+
+            {/* COMMERCIAL DETAILS */}
+            <div>
+              <SectionHeader>Commercial Details</SectionHeader>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-3">
+                <div>
+                  <Label required>Payment Terms</Label>
+                  <Select
+                    value={paymentTerms}
+                    onChange={setPaymentTerms}
+                    options={[...PAYMENT_TERMS_OPTIONS]}
+                    placeholder="Select payment terms"
+                    error={submitted && !!errors["paymentTerms"]}
+                  />
+                </div>
+                <div>
+                  <Label required>Expected Demand</Label>
+                  <Select
+                    value={expectedDemand}
+                    onChange={setExpectedDemand}
+                    options={[...EXPECTED_DEMAND_OPTIONS]}
+                    placeholder="Select expected demand"
+                    error={submitted && !!errors["expectedDemand"]}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* LOGISTICS & FULFILMENT */}
+            <div>
+              <SectionHeader>Logistics &amp; Fulfilment</SectionHeader>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-3 gap-y-3">
+                <div>
+                  <Label required>Delivery locations</Label>
+                  <Select
+                    value={deliveryLocations}
+                    onChange={setDeliveryLocations}
+                    options={[...DELIVERY_LOCATIONS_OPTIONS]}
+                    placeholder="Select delivery type"
+                    error={submitted && !!errors["deliveryLocations"]}
+                  />
+                </div>
+                {deliveryLocations === "Multi-site" ? (
+                  <div>
+                    <Label required>Number of delivery locations</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={deliveryLocationCount}
+                      onChange={setDeliveryLocationCount}
+                      placeholder="Quantity"
+                      error={submitted && !!errors["deliveryLocationCount"]}
+                    />
+                  </div>
+                ) : (
+                  <div className="hidden sm:block" aria-hidden />
+                )}
+                <div>
+                  <Label required>Delivery timeline for first order</Label>
+                  <Input
+                    type="date"
+                    value={firstOrderDeliveryDate}
+                    onChange={setFirstOrderDeliveryDate}
+                    error={submitted && !!errors["firstOrderDeliveryDate"]}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* SHIPPING DETAILS */}
+            <div>
+              <SectionHeader>Shipping Details</SectionHeader>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-3 gap-y-3">
+                <div>
+                  <Label required>Freight responsibility</Label>
+                  <Select
+                    value={freightResponsibility}
+                    onChange={setFreightResponsibility}
+                    options={[...FREIGHT_RESPONSIBILITY_OPTIONS]}
+                    placeholder="Select"
+                    error={submitted && !!errors["freightResponsibility"]}
+                  />
+                </div>
+                <div>
+                  <Label required>Delivery Charges</Label>
+                  <Select
+                    value={deliveryCharges}
+                    onChange={setDeliveryCharges}
+                    options={[...DELIVERY_CHARGES_OPTIONS]}
+                    placeholder="Select"
+                    error={submitted && !!errors["deliveryCharges"]}
+                  />
+                </div>
+                <div>
+                  <Label required>Carrier billing</Label>
+                  <Select
+                    value={carrierBillingMethod}
+                    onChange={setCarrierBillingMethod}
+                    options={[...CARRIER_BILLING_OPTIONS]}
+                    placeholder="Select shipping method"
+                    error={submitted && !!errors["carrierBillingMethod"]}
+                  />
+                </div>
+                {carrierBillingMethod === "Customer shipping account" ? (
+                  <div>
+                    <Label required>Customer shipping account #</Label>
+                    <Input
+                      value={customerShippingAccountNumber}
+                      onChange={setCustomerShippingAccountNumber}
+                      placeholder="Account number"
+                      error={submitted && !!errors["customerShippingAccountNumber"]}
+                    />
+                  </div>
+                ) : (
+                  <div className="hidden lg:block" aria-hidden />
+                )}
               </div>
             </div>
 
@@ -1279,6 +1532,10 @@ export function OpportunityStageChangeModal({ opportunity, onSave, onCancel }: O
                     items={items}
                     discount={discount} tax={tax} adjustment={adjustment} grandTotal={grandTotal}
                     onDiscount={setDiscount} onTax={setTax} onAdjustment={setAdjustment}
+                    salesCommissionPercent={salesCommissionPercent}
+                    onSalesCommissionPercent={setSalesCommissionPercent}
+                    submitted={submitted}
+                    errors={errors}
                   />
                 </>
               ) : (
@@ -1291,17 +1548,22 @@ export function OpportunityStageChangeModal({ opportunity, onSave, onCancel }: O
                       items={items}
                       discount={discount} tax={tax} adjustment={adjustment} grandTotal={grandTotal}
                       onDiscount={setDiscount} onTax={setTax} onAdjustment={setAdjustment}
+                      salesCommissionPercent={salesCommissionPercent}
+                      onSalesCommissionPercent={setSalesCommissionPercent}
+                      submitted={submitted}
+                      errors={errors}
                     />
                   )}
                 </>
               )}
             </div>
 
-            {/* TEAM FOR APPROVAL */}
-            <div>
-              <SectionHeader>Team for Approval</SectionHeader>
-              <TeamSection />
-            </div>
+            {tenant !== "kevin" && (
+              <div>
+                <SectionHeader>Team for Approval</SectionHeader>
+                <TeamSection />
+              </div>
+            )}
 
             {/* Description */}
             <div>

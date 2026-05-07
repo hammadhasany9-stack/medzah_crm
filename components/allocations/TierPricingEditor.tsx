@@ -6,9 +6,39 @@ import { RotateCcw } from "lucide-react";
 interface TierPricingEditorProps {
   tiers: TierPrice[];
   onChange: (updated: TierPrice[]) => void;
+  readOnly?: boolean;
 }
 
-export function TierPricingEditor({ tiers, onChange }: TierPricingEditorProps) {
+export function TierPricingEditor({ tiers, onChange, readOnly = false }: TierPricingEditorProps) {
+  if (readOnly) {
+    return (
+      <div>
+        <div className="flex items-center justify-between pb-1 mb-4 mt-1">
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Tier Pricing</p>
+        </div>
+
+        <div className="border border-slate-200 rounded-xl overflow-hidden">
+          <div className="grid grid-cols-[80px_1fr_1fr] bg-slate-50 border-b border-slate-200 px-3 py-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Range</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Suggested</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Price</span>
+          </div>
+
+          {tiers.map((tier) => (
+            <div
+              key={tier.rangeLabel}
+              className="grid grid-cols-[80px_1fr_1fr] items-center px-3 py-2.5 border-b border-slate-100 last:border-0"
+            >
+              <span className="text-[13px] font-semibold text-slate-700">{tier.rangeLabel}</span>
+              <span className="text-[13px] text-slate-600">${tier.suggestedPrice.toFixed(2)}</span>
+              <span className="text-[13px] font-semibold text-slate-800">${tier.userPrice.toFixed(2)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   function handlePriceChange(idx: number, value: string) {
     const num = parseFloat(value);
     if (isNaN(num) && value !== "") return;
@@ -28,7 +58,7 @@ export function TierPricingEditor({ tiers, onChange }: TierPricingEditorProps) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between pb-1 mb-4 mt-1">
         <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Tier Pricing</p>
         <button
           type="button"

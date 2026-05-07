@@ -1,6 +1,7 @@
-"use client";
+﻿"use client";
 
 import { usePathname } from "next/navigation";
+import { useTenant, useTenantPath } from "@/components/providers/TenantProvider";
 import { CRMShellProvider } from "./CRMShellContext";
 import { TopNavBar } from "./TopNavBar";
 
@@ -102,6 +103,66 @@ function getPageConfig(pathname: string): PageConfig {
       showCreate: false,
     };
   }
+  if (pathname.startsWith("/dashboard")) {
+    return {
+      title: "Dashboard",
+      myTabLabel: "Dashboard",
+      createLabel: "",
+      createHref: "/dashboard",
+      searchPlaceholder: "",
+      showTabs: false,
+      showSearch: false,
+      showCreate: false,
+    };
+  }
+  if (pathname.startsWith("/settings")) {
+    return {
+      title: "Settings",
+      myTabLabel: "Settings",
+      createLabel: "",
+      createHref: "/settings",
+      searchPlaceholder: "",
+      showTabs: false,
+      showSearch: false,
+      showCreate: false,
+    };
+  }
+  if (pathname.startsWith("/sales-orders")) {
+    return {
+      title: "Sales Orders",
+      myTabLabel: "Sales Orders",
+      createLabel: "",
+      createHref: "/sales-orders",
+      searchPlaceholder: "",
+      showTabs: false,
+      showSearch: false,
+      showCreate: false,
+    };
+  }
+  if (pathname.startsWith("/campaign")) {
+    return {
+      title: "Campaign",
+      myTabLabel: "Campaign",
+      createLabel: "",
+      createHref: "/campaign",
+      searchPlaceholder: "",
+      showTabs: false,
+      showSearch: false,
+      showCreate: false,
+    };
+  }
+  if (pathname === "/inbox" || pathname.startsWith("/inbox/")) {
+    return {
+      title: "Sales Inbox",
+      myTabLabel: "My Leads",
+      createLabel: "New Lead",
+      createHref: "/leads/create",
+      searchPlaceholder: "Search inbox, contacts, or threads...",
+      showTabs: false,
+      showSearch: true,
+      showCreate: true,
+    };
+  }
   if (pathname === "/contracts") {
     return {
       title: "Contracts",
@@ -171,9 +232,32 @@ function getPageConfig(pathname: string): PageConfig {
   };
 }
 
-export function CRMClientShell({ children }: { children: React.ReactNode }) {
+function usePathForShellConfig(): string {
   const pathname = usePathname();
-  const config = getPageConfig(pathname);
+  const { basePath } = useTenant();
+  if (pathname === basePath) return "/";
+  if (pathname.startsWith(basePath + "/")) {
+    return pathname.slice(basePath.length);
+  }
+  return pathname;
+}
+
+export function CRMClientShell({ children }: { children: React.ReactNode }) {
+  const pathForConfig = usePathForShellConfig();
+  const { tenant } = useTenant();
+  const tenantPath = useTenantPath();
+  let config = getPageConfig(pathForConfig);
+  if (
+    tenant === "amanda" &&
+    (pathForConfig.startsWith("/customer-intake") ||
+      pathForConfig.startsWith("/contracts") ||
+      pathForConfig.startsWith("/quotes"))
+  ) {
+    config = { ...config, showCreate: false };
+  }
+  const showInboxNav =
+    pathForConfig === "/inbox" || pathForConfig.startsWith("/inbox/");
+  const createHref = tenantPath(config.createHref);
 
   return (
     <CRMShellProvider>
@@ -181,11 +265,12 @@ export function CRMClientShell({ children }: { children: React.ReactNode }) {
         title={config.title}
         myTabLabel={config.myTabLabel}
         createLabel={config.createLabel}
-        createHref={config.createHref}
+        createHref={createHref}
         searchPlaceholder={config.searchPlaceholder}
         showTabs={config.showTabs}
         showSearch={config.showSearch}
         showCreate={config.showCreate}
+        showInboxNav={showInboxNav}
       />
       <main className="flex-1 overflow-y-auto bg-slate-100">{children}</main>
     </CRMShellProvider>

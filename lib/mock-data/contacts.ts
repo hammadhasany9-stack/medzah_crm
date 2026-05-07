@@ -34,6 +34,12 @@ export interface ContactRecord {
   createdAt: string;
 }
 
+/** Single display column joining primary phone and mobile. */
+export function formatPhoneMobile(c: ContactRecord): string {
+  const parts = [c.phone?.trim(), c.mobile?.trim()].filter(Boolean);
+  return parts.length ? parts.join(" · ") : "";
+}
+
 export const CONTACT_TYPES = [
   "Customer",
   "Partner",
@@ -336,6 +342,62 @@ export const INITIAL_CONTACTS: ContactRecord[] = [
     otherCountry: "",
     description: "Primary contact for the Sunridge account — paired with seeded user-created account.",
     createdAt: new Date("2026-04-18").toISOString(),
+  },
+  {
+    id: "C-54880",
+    contactOwner: "Kevin Calamari",
+    firstName: "Elena",
+    lastName: "Nguyen",
+    contactType: "Customer",
+    email: "e.nguyen@highpointesurgery.com",
+    phone: "(617) 552-3310",
+    otherPhone: "",
+    homePhone: "",
+    mobile: "(617) 552-3399",
+    fax: "",
+    accountName: "High Pointe Surgery Center",
+    department: "Clinical Operations",
+    title: "Nurse Manager",
+    mailingStreet: "300 High Pointe Dr",
+    mailingCity: "Boston",
+    mailingState: "MA",
+    mailingCode: "02108",
+    mailingCountry: "United States",
+    otherStreet: "",
+    otherCity: "",
+    otherState: "",
+    otherCode: "",
+    otherCountry: "",
+    description: "Primary clinical liaison for ambulatory surgery supply and scheduling.",
+    createdAt: new Date("2026-04-01").toISOString(),
+  },
+  {
+    id: "C-54750",
+    contactOwner: "Patrick Moore",
+    firstName: "Stephen",
+    lastName: "Cole",
+    contactType: "Prospect",
+    email: "s.cole@clearviewdiag.com",
+    phone: "(404) 887-5510",
+    otherPhone: "(404) 887-5512",
+    homePhone: "",
+    mobile: "(404) 555-8800",
+    fax: "",
+    accountName: "Clearview Medical Diagnostics",
+    department: "Procurement",
+    title: "Purchasing Director",
+    mailingStreet: "900 Clearview Pkwy",
+    mailingCity: "Atlanta",
+    mailingState: "GA",
+    mailingCode: "30308",
+    mailingCountry: "United States",
+    otherStreet: "",
+    otherCity: "",
+    otherState: "",
+    otherCode: "",
+    otherCountry: "",
+    description: "Evaluating instrumentation contracts for the Southeast expansion.",
+    createdAt: new Date("2026-03-28").toISOString(),
   },
 ];
 

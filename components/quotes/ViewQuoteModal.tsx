@@ -6,6 +6,10 @@ import {
   CheckCircle2, Clock, XCircle, Printer,
 } from "lucide-react";
 import { Opportunity, QuoteData } from "@/lib/types";
+import {
+  QuoteCommercialLogisticsShippingReadOnly,
+  QuotePricingCostBreakdown,
+} from "@/components/quotes/QuoteExtendedSummary";
 import * as XLSX from "xlsx";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -47,12 +51,28 @@ function downloadQuoteXLSX(opp: Opportunity, data?: QuoteData) {
     ["Business Type", q.businessType],
     ["Opportunity Owner", q.opportunityOwner],
     [],
+    ["COMMERCIAL & LOGISTICS"],
+    ["Payment Terms", q.paymentTerms || "—"],
+    ["Expected Demand", q.expectedDemand || "—"],
+    ["Delivery Locations", q.deliveryLocations || "—"],
+    ["Number of Delivery Locations", q.deliveryLocationCount || "—"],
+    ["First Order Delivery", q.firstOrderDeliveryDate || "—"],
+    ["Freight Responsibility", q.freightResponsibility || "—"],
+    ["Delivery Charges", q.deliveryCharges || "—"],
+    ["Carrier Billing", q.carrierBillingMethod || "—"],
+    ["Customer Shipping Account #", q.customerShippingAccountNumber || "—"],
+    [],
     ["FINANCIAL SUMMARY"],
     ["Subtotal", `$${q.subtotal}`],
     ["Discount", q.discount || "$0"],
     ["Tax", q.tax || "$0"],
     ["Adjustment", q.adjustment || "$0"],
-    ["Grand Total", `$${q.grandTotal}`],
+    ["Grand Total (product)", `$${q.grandTotal}`],
+    ["Overhead %", q.overheadInfrastructurePercent || "25"],
+    ["Overhead ($)", `$${q.overheadAmount ?? "0"}`],
+    ["Sales commission %", q.salesCommissionPercent || "0"],
+    ["Sales commission ($)", `$${q.salesCommissionAmount ?? "0"}`],
+    ["Final Quote Total", `$${q.finalQuoteTotal ?? q.grandTotal}`],
   ];
   const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
   summaryWs["!cols"] = [{ wch: 28 }, { wch: 32 }];
@@ -69,7 +89,10 @@ function downloadQuoteXLSX(opp: Opportunity, data?: QuoteData) {
     ["", "", "", "", "Discount", q.discount || "$0"],
     ["", "", "", "", "Tax", q.tax || "$0"],
     ["", "", "", "", "Adjustment", q.adjustment || "$0"],
-    ["", "", "", "", "Grand Total", `$${q.grandTotal}`],
+    ["", "", "", "", "Grand Total (product)", `$${q.grandTotal}`],
+    ["", "", "", "", "Overhead", `$${q.overheadAmount ?? "0"}`],
+    ["", "", "", "", "Sales commission", `$${q.salesCommissionAmount ?? "0"}`],
+    ["", "", "", "", "Final Quote Total", `$${q.finalQuoteTotal ?? q.grandTotal}`],
   ];
   const itemsWs = XLSX.utils.aoa_to_sheet(itemsData);
   itemsWs["!cols"] = [{ wch: 4 }, { wch: 30 }, { wch: 28 }, { wch: 10 }, { wch: 14 }, { wch: 14 }];
@@ -152,6 +175,7 @@ export function ViewQuoteModal({ opportunity, onClose }: ViewQuoteModalProps) {
   const tax       = parseMoney(q.tax);
   const adjustment = parseMoney(q.adjustment);
   const grandTotal = parseMoney(q.grandTotal);
+  const displayHeroTotal = parseMoney(q.finalQuoteTotal?.trim() ? q.finalQuoteTotal : q.grandTotal);
 
   const quoteRef = q.quoteId ?? opportunity.opportunityRef;
   const issueDate = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
@@ -270,8 +294,10 @@ export function ViewQuoteModal({ opportunity, onClose }: ViewQuoteModalProps) {
                   </div>
                   {/* Grand total highlight */}
                   <div className="mt-3 bg-[#002f93] rounded-xl px-4 py-2.5 text-right">
-                    <p className="text-[10px] font-semibold text-white/70 uppercase tracking-widest">Grand Total</p>
-                    <p className="text-[22px] font-black text-white leading-tight">{fmt(grandTotal)}</p>
+                    <p className="text-[10px] font-semibold text-white/70 uppercase tracking-widest">
+                      {q.finalQuoteTotal?.trim() ? "Final Quote Total" : "Grand Total"}
+                    </p>
+                    <p className="text-[22px] font-black text-white leading-tight">{fmt(displayHeroTotal)}</p>
                   </div>
                 </div>
               </div>
@@ -327,6 +353,11 @@ export function ViewQuoteModal({ opportunity, onClose }: ViewQuoteModalProps) {
                 <span><span className="text-slate-400">Business Type:</span> {q.businessType}</span>
                 <span><span className="text-slate-400">Opportunity:</span> {q.opportunityName}</span>
               </div>
+            </div>
+
+            {/* Commercial, logistics & shipping (proposal / create quote) */}
+            <div className="px-8 py-5 border-b border-slate-100 bg-white">
+              <QuoteCommercialLogisticsShippingReadOnly q={q} />
             </div>
 
             {/* Line items table */}
@@ -403,9 +434,10 @@ export function ViewQuoteModal({ opportunity, onClose }: ViewQuoteModalProps) {
                         </div>
                       )}
                       <div className="flex justify-between text-[15px] font-black text-slate-900 border-t-2 border-slate-200 pt-2 mt-2">
-                        <span>GRAND TOTAL</span>
+                        <span>GRAND TOTAL (PRODUCT)</span>
                         <span className="tabular-nums text-[#002f93]">{fmt(grandTotal)}</span>
                       </div>
+                      <QuotePricingCostBreakdown q={q} omitProductLine className="text-left min-w-[220px]" />
                     </div>
                   </div>
                 </div>

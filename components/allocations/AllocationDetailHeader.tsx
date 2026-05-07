@@ -1,8 +1,14 @@
 "use client";
 
-import Link from "next/link";
-import { ChevronLeft, CheckCircle2, GitMerge, Clock, Package } from "lucide-react";
-import { AllocationRecord, AllocationRecordStatus, Priority } from "@/lib/types";
+import { TenantLink } from "@/components/providers/TenantLink";
+import { ChevronLeft, CheckCircle2, GitMerge, Clock, Package, Ban } from "lucide-react";
+import {
+  AllocationRecord,
+  AllocationRecordStatus,
+  Priority,
+  safeAllocationPriority,
+  safeAllocationStatus,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { canDownloadAllocationExport } from "@/lib/export-allocation-xlsx";
 import { DownloadAllocationButton } from "@/components/allocations/DownloadAllocationButton";
@@ -69,6 +75,14 @@ function StatusBanner({ status, onHoldTime, unavailableCount }: {
       </div>
     );
   }
+  if (status === "Rejected") {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wide bg-rose-50 text-rose-700 border border-rose-200">
+        <Ban size={12} />
+        Rejected
+      </span>
+    );
+  }
   return null;
 }
 
@@ -80,6 +94,11 @@ interface AllocationDetailHeaderProps {
   onApprove: () => void;
   onPartiallyApprove: () => void;
   onHold: () => void;
+  onReject: () => void;
+  /** When false, hide procurement action buttons (e.g. Kevin view-only). Default true. */
+  showProcurementActions?: boolean;
+  /** When false, hide export download. Default true. */
+  showExport?: boolean;
 }
 
 export function AllocationDetailHeader({
@@ -89,20 +108,24 @@ export function AllocationDetailHeader({
   onApprove,
   onPartiallyApprove,
   onHold,
+  onReject,
+  showProcurementActions = true,
+  showExport = true,
 }: AllocationDetailHeaderProps) {
-  const isActionable = record.status === "Pending";
+  const status = safeAllocationStatus(record);
+  const isActionable = status === "Pending" && showProcurementActions;
   const downloadSource = exportRecord ?? record;
 
   return (
     <div className="bg-white rounded-xl border border-slate-100 shadow-sm px-6 py-5">
       {/* Back nav */}
-      <Link
+      <TenantLink
         href="/allocation"
         className="inline-flex items-center gap-1 text-xs font-semibold text-slate-400 hover:text-[#002f93] mb-4 transition-colors"
       >
         <ChevronLeft size={14} />
         Back to Allocations
-      </Link>
+      </TenantLink>
 
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-5">
 
@@ -114,7 +137,7 @@ export function AllocationDetailHeader({
           <div>
             <div className="flex items-center gap-2 flex-wrap mb-1">
               <h1 className="text-xl font-bold text-slate-900">{record.contactName}</h1>
-              <PriorityBadge priority={record.leadPriority} />
+              <PriorityBadge priority={safeAllocationPriority(record)} />
               <span className="text-xs font-semibold text-slate-400">{record.allocationRef}</span>
             </div>
             <p className="text-sm font-semibold text-slate-600">{record.companyName}</p>
@@ -130,12 +153,17 @@ export function AllocationDetailHeader({
 
         {/* Right: actions or status banner */}
         <div className="flex items-center gap-2 flex-wrap">
-          {canDownloadAllocationExport(record.status) && (
+          {showExport && canDownloadAllocationExport(status) && (
             <DownloadAllocationButton record={downloadSource} size="md" />
+          )}
+          {status === "Pending" && !showProcurementActions && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wide bg-slate-100 text-slate-600 border border-slate-200">
+              Pending
+            </span>
           )}
           {!isActionable ? (
             <StatusBanner
-              status={record.status}
+              status={status}
               onHoldTime={record.onHoldFulfillmentTime}
               unavailableCount={unavailableCount}
             />
@@ -164,6 +192,14 @@ export function AllocationDetailHeader({
               >
                 <Clock size={15} />
                 On Hold
+              </button>
+              <button
+                type="button"
+                onClick={onReject}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold border border-red-300 text-red-700 bg-red-50/60 rounded-lg hover:bg-red-100 transition-colors"
+              >
+                <Ban size={15} />
+                Reject
               </button>
             </>
           )}

@@ -7,6 +7,13 @@ import { Package, Factory, Ruler, ArrowLeftRight, DollarSign } from "lucide-reac
 interface ExpandedProductRowProps {
   product: AllocationProduct;
   onTierChange: (updatedTiers: TierPrice[]) => void;
+  /** Catalog stock minus approved commitments; enables depleted qty + allocated bracket. */
+  inventorySummary?: {
+    remaining: number;
+    allocatedTotal: number;
+    baseQty: number;
+  };
+  readOnly?: boolean;
 }
 
 function InfoItem({ label, value }: { label: string; value: string | number }) {
@@ -18,9 +25,16 @@ function InfoItem({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-export function ExpandedProductRow({ product, onTierChange }: ExpandedProductRowProps) {
+export function ExpandedProductRow({
+  product,
+  onTierChange,
+  inventorySummary,
+  readOnly = false,
+}: ExpandedProductRowProps) {
   const inv = product.inventory;
-  const isAvailable = inv.qtyAvailable >= product.requiredQty;
+  const qtyLeft = inventorySummary?.remaining ?? inv.qtyAvailable;
+  const allocatedTotal = inventorySummary?.allocatedTotal ?? 0;
+  const isAvailable = qtyLeft >= product.requiredQty;
 
   return (
     <div className="bg-slate-50/70 border-t border-slate-100 px-6 py-5">
@@ -49,8 +63,14 @@ export function ExpandedProductRow({ product, onTierChange }: ExpandedProductRow
 
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Qty Available</p>
-              <p className={`text-sm font-bold ${isAvailable ? "text-emerald-600" : "text-red-500"}`}>
-                {inv.qtyAvailable.toLocaleString()} {inv.uom}
+              <p className={`text-sm font-bold leading-snug ${isAvailable ? "text-emerald-600" : "text-red-500"}`}>
+                {qtyLeft.toLocaleString()} {inv.uom}
+                {inventorySummary !== undefined && (
+                  <span className="text-xs font-semibold text-slate-500 tabular-nums">
+                    {" "}
+                    ({allocatedTotal.toLocaleString()} allocated)
+                  </span>
+                )}
               </p>
             </div>
 
@@ -90,7 +110,7 @@ export function ExpandedProductRow({ product, onTierChange }: ExpandedProductRow
 
         {/* ── Tier Pricing ── */}
         <div>
-          <TierPricingEditor tiers={product.tierPrices} onChange={onTierChange} />
+          <TierPricingEditor tiers={product.tierPrices} onChange={onTierChange} readOnly={readOnly} />
         </div>
       </div>
     </div>

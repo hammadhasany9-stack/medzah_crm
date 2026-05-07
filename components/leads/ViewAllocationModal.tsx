@@ -3,11 +3,12 @@
 import { useState } from "react";
 import {
   X, CheckCircle2, AlertTriangle, PackageSearch, ChevronDown, ChevronRight,
-  MapPin, Phone, Mail, Building2, Clock, PauseCircle,
+  MapPin, Phone, Mail, Building2, Clock, PauseCircle, Ban,
 } from "lucide-react";
 import { AllocationRecord, AllocationProduct } from "@/lib/types";
 import { canDownloadAllocationExport } from "@/lib/export-allocation-xlsx";
 import { DownloadAllocationButton } from "@/components/allocations/DownloadAllocationButton";
+import { AccountHistorySection } from "@/components/accounts/AccountHistorySection";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -166,6 +167,14 @@ function StatusBanner({ status }: { status: AllocationRecord["status"] }) {
       </div>
     );
   }
+  if (status === "Rejected") {
+    return (
+      <div className="flex items-center gap-2 px-4 py-2.5 bg-rose-50 border-b border-rose-100">
+        <Ban size={14} className="text-rose-600 flex-shrink-0" />
+        <p className="text-[12px] font-semibold text-rose-800">Allocation was rejected — see rejection details below.</p>
+      </div>
+    );
+  }
   return null;
 }
 
@@ -219,6 +228,18 @@ export function AllocationRecordDetailContent({
         </div>
       )}
 
+      {allocation.linkedAccountId && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500 whitespace-nowrap">
+              Account History
+            </p>
+            <div className="flex-1 h-px bg-slate-200" />
+          </div>
+          <AccountHistorySection accountId={allocation.linkedAccountId} />
+        </div>
+      )}
+
       {/* Products */}
       <div>
         <div className="flex items-center gap-2 mb-3">
@@ -233,6 +254,37 @@ export function AllocationRecordDetailContent({
           ))}
         </div>
       </div>
+
+      {/* Rejection details */}
+      {allocation.status === "Rejected" &&
+        (allocation.rejectionCategory || allocation.rejectionDetail) && (
+          <div className="rounded-xl border border-rose-200 overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-2.5 bg-rose-50 border-b border-rose-100">
+              <Ban size={13} className="text-rose-600 flex-shrink-0" />
+              <p className="text-[11px] font-bold uppercase tracking-widest text-rose-700">Rejection</p>
+            </div>
+            <div className="px-4 py-3 bg-white space-y-3">
+              {allocation.rejectionCategory && (
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle size={13} className="text-rose-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Reason</p>
+                    <p className="text-[13px] font-semibold text-slate-800 mt-0.5">{allocation.rejectionCategory}</p>
+                  </div>
+                </div>
+              )}
+              {allocation.rejectionDetail && (
+                <div className="flex items-start gap-2.5">
+                  <Clock size={13} className="text-slate-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Notes</p>
+                    <p className="text-[13px] text-slate-700 leading-relaxed mt-0.5">{allocation.rejectionDetail}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
       {/* On Hold details */}
       {allocation.status === "On Hold" && (allocation.onHoldNotes || allocation.onHoldFulfillmentTime) && (
@@ -285,6 +337,8 @@ export function ViewAllocationModal({ allocation, onClose, compact = false }: Vi
         ? "bg-amber-50 text-amber-700 border-amber-200"
         : allocation.status === "On Hold"
         ? "bg-slate-100 text-slate-600 border-slate-200"
+        : allocation.status === "Rejected"
+        ? "bg-rose-50 text-rose-800 border-rose-200"
         : "bg-blue-50 text-blue-700 border-blue-200"
     }`}>
       {allocation.status}

@@ -4,13 +4,15 @@ import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { Opportunity } from "@/lib/types";
 import { QuoteCard } from "./QuoteCard";
+import { cn } from "@/lib/utils";
 
 interface DraggableQuoteCardProps {
   opportunity: Opportunity;
   onClick: (opp: Opportunity) => void;
+  className?: string;
 }
 
-export function DraggableQuoteCard({ opportunity, onClick }: DraggableQuoteCardProps) {
+export function DraggableQuoteCard({ opportunity, onClick, className }: DraggableQuoteCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: opportunity.id,
     data: { opportunity },
@@ -24,11 +26,17 @@ export function DraggableQuoteCard({ opportunity, onClick }: DraggableQuoteCardP
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...listeners} {...attributes}>
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(className)}
+      {...listeners}
+      {...attributes}
+    >
       <QuoteCard
         opportunity={opportunity}
-        onClick={(opp) => {
-          if (!transform) onClick(opp);
+        onClick={(o) => {
+          if (!transform) onClick(o);
         }}
       />
     </div>

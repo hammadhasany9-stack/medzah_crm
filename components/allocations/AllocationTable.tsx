@@ -1,12 +1,29 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useTenantRouter } from "@/components/providers/TenantProvider";
 import { ChevronUp, ChevronDown, ChevronsUpDown, Inbox, Calendar } from "lucide-react";
-import { AllocationRecord, AllocationRecordStatus, Priority } from "@/lib/types";
+import {
+  AllocationRecord,
+  AllocationRecordStatus,
+  Priority,
+  resolveAllocationCustomerType,
+  safeAllocationPriority,
+  safeAllocationStatus,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-type SortField = "allocationRef" | "contactName" | "companyName" | "leadSource" | "leadPriority" | "totalProducts" | "ownerName" | "dueDate" | "status";
+type SortField =
+  | "allocationRef"
+  | "contactName"
+  | "companyName"
+  | "customerType"
+  | "leadSource"
+  | "leadPriority"
+  | "totalProducts"
+  | "ownerName"
+  | "dueDate"
+  | "status";
 type SortDir   = "asc" | "desc";
 
 function SortIcon({ field, sortField, sortDir }: { field: SortField; sortField: SortField; sortDir: SortDir }) {
@@ -38,6 +55,7 @@ function StatusBadge({ status }: { status: AllocationRecordStatus }) {
     Approved:             "bg-emerald-50 text-emerald-700 border border-emerald-200",
     "Partially Approved": "bg-amber-50 text-amber-700 border border-amber-200",
     "On Hold":            "bg-red-50 text-red-600 border border-red-200",
+    Rejected:             "bg-rose-50 text-rose-700 border border-rose-200",
   };
   return (
     <span className={cn("inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide", styles[status])}>
@@ -77,6 +95,7 @@ const COLUMNS: { key: SortField; label: string }[] = [
   { key: "allocationRef",  label: "Allocation ID" },
   { key: "contactName",    label: "Contact Name" },
   { key: "companyName",    label: "Company Name" },
+  { key: "customerType",   label: "Customer type" },
   { key: "leadSource",     label: "Lead Source" },
   { key: "leadPriority",   label: "Lead Priority" },
   { key: "totalProducts",  label: "Total Products" },
@@ -86,7 +105,7 @@ const COLUMNS: { key: SortField; label: string }[] = [
 ];
 
 export function AllocationTable({ records }: AllocationTableProps) {
-  const router = useRouter();
+  const router = useTenantRouter();
   const [sortField, setSortField] = useState<SortField>("dueDate");
   const [sortDir,   setSortDir]   = useState<SortDir>("asc");
 
@@ -100,6 +119,28 @@ export function AllocationTable({ records }: AllocationTableProps) {
   }
 
   const sorted = [...records].sort((a, b) => {
+    if (sortField === "customerType") {
+      const av = resolveAllocationCustomerType(a);
+      const bv = resolveAllocationCustomerType(b);
+      const cmp = av.localeCompare(bv);
+      return sortDir === "asc" ? cmp : -cmp;
+    }
+    if (sortField === "leadPriority") {
+      const cmp = safeAllocationPriority(a).localeCompare(safeAllocationPriority(b));
+      return sortDir === "asc" ? cmp : -cmp;
+    }
+    if (sortField === "status") {
+      const cmp = safeAllocationStatus(a).localeCompare(safeAllocationStatus(b));
+      return sortDir === "asc" ? cmp : -cmp;
+    }
+    if (sortField === "dueDate") {
+      const at = new Date(a.dueDate ?? "").getTime();
+      const bt = new Date(b.dueDate ?? "").getTime();
+      const av = Number.isNaN(at) ? 0 : at;
+      const bv = Number.isNaN(bt) ? 0 : bt;
+      const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+      return sortDir === "asc" ? cmp : -cmp;
+    }
     const av = (a[sortField] ?? "") as string | number;
     const bv = (b[sortField] ?? "") as string | number;
     const cmp = av < bv ? -1 : av > bv ? 1 : 0;
@@ -155,10 +196,13 @@ export function AllocationTable({ records }: AllocationTableProps) {
                   {rec.companyName}
                 </td>
                 <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
+                  {resolveAllocationCustomerType(rec) === "existing" ? "Existing" : "New"}
+                </td>
+                <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
                   {rec.leadSource}
                 </td>
                 <td className="px-4 py-3">
-                  <PriorityBadge priority={rec.leadPriority} />
+                  <PriorityBadge priority={safeAllocationPriority(rec)} />
                 </td>
                 <td className="px-4 py-3 text-slate-700 font-medium text-center">
                   {rec.totalProducts}
@@ -170,7 +214,7 @@ export function AllocationTable({ records }: AllocationTableProps) {
                   <DueDateCell dueDate={rec.dueDate} />
                 </td>
                 <td className="px-4 py-3">
-                  <StatusBadge status={rec.status} />
+                  <StatusBadge status={safeAllocationStatus(rec)} />
                 </td>
               </tr>
             ))}

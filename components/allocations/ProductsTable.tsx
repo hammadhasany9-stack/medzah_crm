@@ -8,7 +8,13 @@ import { cn } from "@/lib/utils";
 
 interface ProductsTableProps {
   products: AllocationProduct[];
-  onProductsChange: (updated: AllocationProduct[]) => void;
+  onProductsChange?: (updated: AllocationProduct[]) => void;
+  readOnly?: boolean;
+  /** When set, availability uses catalog-backed remaining after approved commitments. */
+  inventoryBySku?: Record<
+    string,
+    { remaining: number; allocatedTotal: number; baseQty: number }
+  >;
 }
 
 function AvailabilityBadge({ available }: { available: boolean }) {
@@ -27,7 +33,12 @@ function AvailabilityBadge({ available }: { available: boolean }) {
   );
 }
 
-export function ProductsTable({ products, onProductsChange }: ProductsTableProps) {
+export function ProductsTable({
+  products,
+  onProductsChange,
+  readOnly = false,
+  inventoryBySku,
+}: ProductsTableProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   function toggleRow(sku: string) {
@@ -39,6 +50,7 @@ export function ProductsTable({ products, onProductsChange }: ProductsTableProps
   }
 
   function handleTierChange(sku: string, updatedTiers: TierPrice[]) {
+    if (readOnly || !onProductsChange) return;
     onProductsChange(
       products.map((p) => (p.sku === sku ? { ...p, tierPrices: updatedTiers } : p))
     );
@@ -56,7 +68,9 @@ export function ProductsTable({ products, onProductsChange }: ProductsTableProps
       </div>
 
       {products.map((product) => {
-        const isAvailable = product.inventory.qtyAvailable >= product.requiredQty;
+        const inv = inventoryBySku?.[product.sku];
+        const remainingForCheck = inv?.remaining ?? product.inventory.qtyAvailable;
+        const isAvailable = remainingForCheck >= product.requiredQty;
         const isOpen = expanded.has(product.sku);
 
         return (
@@ -77,15 +91,23 @@ export function ProductsTable({ products, onProductsChange }: ProductsTableProps
                 }
               </div>
 
-              <div className="px-4 py-3.5 text-xs font-mono font-semibold text-slate-600">
+              <div className="px-4 py-3.5 text-xs font-medium font-semibold text-slate-600">
                 {product.sku}
               </div>
               <div className="px-4 py-3.5 text-sm font-medium text-slate-800">
                 {product.productName}
               </div>
               <div className="px-4 py-3.5 text-sm text-slate-700 font-semibold">
-                {product.requiredQty.toLocaleString()}
-                <span className="text-xs text-slate-400 font-normal ml-1">{product.inventory.uom}</span>
+                <div>
+                  {product.requiredQty.toLocaleString()}
+                  <span className="text-xs text-slate-400 font-normal ml-1">{product.inventory.uom}</span>
+                </div>
+                {inv && (
+                  <div className="text-xs text-slate-500 font-normal mt-1 leading-snug">
+                    {inv.remaining.toLocaleString()} {product.inventory.uom} available (
+                    {inv.allocatedTotal.toLocaleString()} allocated)
+                  </div>
+                )}
               </div>
               <div className="px-4 py-3.5">
                 <AvailabilityBadge available={isAvailable} />
@@ -97,6 +119,8 @@ export function ProductsTable({ products, onProductsChange }: ProductsTableProps
               <ExpandedProductRow
                 product={product}
                 onTierChange={(tiers) => handleTierChange(product.sku, tiers)}
+                inventorySummary={inventoryBySku?.[product.sku]}
+                readOnly={readOnly}
               />
             )}
           </div>

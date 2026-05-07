@@ -234,15 +234,18 @@ export function LeadCard({ lead, onClick, variant = "pipeline" }: LeadCardProps)
   const [showAllocModal, setShowAllocModal] = useState(false);
 
   const inAllocationColumn = lead.status === "Allocation" || lead.status === "Allocation on hold";
-  const isApproved = lead.procurementStatus === "approved";
   const allocationRecord = lead.allocationId
     ? allocations.find((a) => a.id === lead.allocationId) ?? null
     : null;
-  // Show the View Allocation button only when the record has a non-Pending status
+  // Non-Pending allocation outcomes: view modal allowed
   const allocViewable = allocationRecord &&
     (allocationRecord.status === "Approved" ||
      allocationRecord.status === "Partially Approved" ||
-     allocationRecord.status === "On Hold");
+     allocationRecord.status === "On Hold" ||
+     allocationRecord.status === "Rejected");
+
+  const showAllocationActionsRow =
+    Boolean(lead.procurementStatus) || Boolean(allocationRecord && allocViewable);
 
   return (
     <>
@@ -271,6 +274,11 @@ export function LeadCard({ lead, onClick, variant = "pipeline" }: LeadCardProps)
             )}
             {inAllocationColumn && allocationRecord && (
               <AllocationRecordVerdictBadge record={allocationRecord} />
+            )}
+            {lead.status === "Inactive" && lead.allocationRejection && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap bg-rose-50 text-rose-800 border border-rose-200">
+                Allocation rejection
+              </span>
             )}
           </div>
 
@@ -307,19 +315,20 @@ export function LeadCard({ lead, onClick, variant = "pipeline" }: LeadCardProps)
         <ViewProductsSection lead={lead} />
 
         {/* ── Procurement status badge ── */}
-        {lead.procurementStatus && (
+        {showAllocationActionsRow && (
           <>
             <div className="h-px bg-slate-100 mx-4" />
             <div className="px-4 py-2.5 flex items-center justify-between gap-2">
-              {/* Hide "Checking" badge once a verdict has been given */}
-              {!allocViewable && <ProcurementBadge status={lead.procurementStatus} />}
+              {lead.procurementStatus && !allocViewable && (
+                <ProcurementBadge status={lead.procurementStatus} />
+              )}
+              {!lead.procurementStatus && <span className="min-w-0 flex-1" />}
 
-              <div className="flex items-center gap-2 flex-wrap justify-end ml-auto">
+              <div className="flex items-center gap-2 flex-shrink-0 justify-end ml-auto">
                 {allocationRecord && canDownloadAllocationExport(allocationRecord.status) && (
                   <DownloadAllocationButton record={allocationRecord} stopPropagation size="sm" />
                 )}
-                {/* View Allocation button — only when verdict is in */}
-                {(isApproved || allocViewable) && (
+                {allocViewable && (
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setShowAllocModal(true); }}
@@ -330,6 +339,23 @@ export function LeadCard({ lead, onClick, variant = "pipeline" }: LeadCardProps)
                   </button>
                 )}
               </div>
+            </div>
+          </>
+        )}
+
+        {/* ── Allocation rejection (inactive) ── */}
+        {lead.status === "Inactive" && lead.allocationRejection && (
+          <>
+            <div className="h-px bg-slate-100 mx-4" />
+            <div className="px-4 py-2.5 flex flex-col gap-1.5">
+              <p className="text-[12px] font-semibold text-slate-800 leading-snug">
+                {lead.allocationRejection.category}
+              </p>
+              {lead.allocationRejection.detail && (
+                <p className="text-[11px] text-slate-500 leading-snug line-clamp-3">
+                  {lead.allocationRejection.detail}
+                </p>
+              )}
             </div>
           </>
         )}

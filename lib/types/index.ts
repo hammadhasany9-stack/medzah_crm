@@ -11,6 +11,9 @@ export interface ProductRow {
   unitPrice?: number;
 }
 
+/** New vs existing customer — used on leads and allocations. */
+export type AllocationCustomerType = "new" | "existing";
+
 export type LeadStatus =
   | "New"
   | "Attempted Contact"
@@ -28,6 +31,12 @@ export interface ActivityEvent {
   timestamp: string;
 }
 
+/** Set when procurement rejects an allocation; lead is moved to Inactive. */
+export interface LeadAllocationRejection {
+  category: string;
+  detail?: string;
+}
+
 export interface Lead {
   id: string;
   leadRef: string;
@@ -42,6 +51,7 @@ export interface Lead {
   callDue?: string;
   reason?: string;
   reasonNote?: string;
+  allocationRejection?: LeadAllocationRejection;
   procurementStatus?: ProcurementStatus;
   procurementProducts?: ProductRow[];
   opportunityData?: OpportunityData;
@@ -50,6 +60,10 @@ export interface Lead {
   location?: string;
   contactTitle?: string;
   customerFor?: string;
+  /** Set at lead creation; legacy leads omit (= implicit new customer). */
+  customerType?: AllocationCustomerType;
+  linkedAccountId?: string;
+  linkedContactId?: string;
   email: string;
   phone: string;
   validTill: string;
@@ -89,6 +103,21 @@ export type OpportunityStage =
   | "Negotiation/Review"
   | "Closed Won"
   | "Closed Lost";
+
+export type ClosedLostReason =
+  | "customer_disapproval_quotation"
+  | "customer_no_response"
+  | "other";
+
+export const CLOSED_LOST_REASON_LABELS: Record<ClosedLostReason, string> = {
+  customer_disapproval_quotation: "Customer disapproval with quotation",
+  customer_no_response: "Customer didn't respond",
+  other: "Other",
+};
+
+export function closedLostReasonLabel(reason: ClosedLostReason): string {
+  return CLOSED_LOST_REASON_LABELS[reason];
+}
 
 export type QuoteStatus = "none" | "pending" | "approved" | "rejected";
 
@@ -158,6 +187,23 @@ export interface QuoteData {
   tax: string;
   adjustment: string;
   grandTotal: string;
+  /** Commercial / logistics / shipping (Proposal modal) */
+  paymentTerms: string;
+  expectedDemand: string;
+  deliveryLocations: string;
+  deliveryLocationCount: string;
+  firstOrderDeliveryDate: string;
+  freightResponsibility: string;
+  deliveryCharges: string;
+  carrierBillingMethod: string;
+  customerShippingAccountNumber: string;
+  /** Fixed 25% infrastructure markup (stored for history; UI read-only) */
+  overheadInfrastructurePercent: string;
+  salesCommissionPercent: string;
+  freightCostAmount: string;
+  overheadAmount: string;
+  salesCommissionAmount: string;
+  finalQuoteTotal: string;
   termsAndConditions: string;
   description: string;
   followUpDate: string;
@@ -197,10 +243,15 @@ export interface Opportunity {
   /** True when quote was re-submitted from Negotiation via Revise Quote (awaiting approval). */
   quoteRevised?: boolean;
   quoteRejectionReason?: string;
+  /** Display name of user who approved or rejected the quote (set when decision is finalized). */
+  quoteDecisionBy?: string;
   quoteHistory?: QuoteRecord[];
   procurementAllocation?: ProcurementAllocation;
   leadId?: string;
   allocationId?: string;
+  closedLostReason?: ClosedLostReason;
+  /** Extra context when closing lost (distinct from opportunity description/note). */
+  closedLostDescription?: string;
 }
 
 // ─── Contract types ───────────────────────────────────────────────────────────
@@ -286,7 +337,8 @@ export type AllocationRecordStatus =
   | "Pending"
   | "Approved"
   | "Partially Approved"
-  | "On Hold";
+  | "On Hold"
+  | "Rejected";
 
 export interface TierPrice {
   rangeLabel: string;
@@ -317,6 +369,9 @@ export interface AllocationRecord {
   id: string;
   allocationRef: string;
   leadId?: string;
+  linkedAccountId?: string;
+  /** Set when created from leads; if missing (old localStorage), infer from linkedAccountId. */
+  customerType?: AllocationCustomerType;
   contactName: string;
   companyName: string;
   email: string;
@@ -333,5 +388,34 @@ export interface AllocationRecord {
   createdDate: string;
   onHoldFulfillmentTime?: string;
   onHoldNotes?: string;
+  /** When status is Rejected — predefined category from reject modal */
+  rejectionCategory?: string;
+  /** Optional free-text context */
+  rejectionDetail?: string;
   products: AllocationProduct[];
+}
+
+export function resolveAllocationCustomerType(
+  r: AllocationRecord
+): AllocationCustomerType {
+  return r.customerType ?? (r.linkedAccountId ? "existing" : "new");
+}
+
+/** Use when rendering / sorting — avoids crashes if localStorage rows omit or corrupt fields. */
+export function safeAllocationPriority(r: Pick<AllocationRecord, "leadPriority">): Priority {
+  const p = r.leadPriority;
+  return p === "Hot" || p === "Warm" || p === "Cold" ? p : "Warm";
+}
+
+export function safeAllocationStatus(
+  r: Pick<AllocationRecord, "status">
+): AllocationRecordStatus {
+  const s = r.status;
+  return s === "Pending" ||
+    s === "Approved" ||
+    s === "Partially Approved" ||
+    s === "On Hold" ||
+    s === "Rejected"
+    ? s
+    : "Pending";
 }

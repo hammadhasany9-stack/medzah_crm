@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, type MutableRefObject } from "react";
-import { mockProducts } from "@/lib/mock-data/products";
+import { buildAllocationRecord } from "@/lib/allocation-from-lead";
 import {
   DndContext,
   DragEndEvent,
@@ -12,7 +12,7 @@ import {
   useSensors,
   closestCenter,
 } from "@dnd-kit/core";
-import { Lead, KanbanColumn as KanbanColumnType, LeadStatus, Priority, OpportunityData, Opportunity, AllocationRecord, AllocationProduct, InventoryItem, ProductRow } from "@/lib/types";
+import { Lead, KanbanColumn as KanbanColumnType, LeadStatus, Priority, OpportunityData, Opportunity, AllocationRecord } from "@/lib/types";
 import { KanbanColumn } from "./KanbanColumn";
 import { LeadCard } from "./LeadCard";
 import { AttemptedContactModal } from "./AttemptedContactModal";
@@ -153,66 +153,11 @@ export function LeadsKanbanBoard({
   }
 
   // ── Shared helper: build AllocationRecord and fire the callback ──────────────
-  function buildAndFireAllocation(lead: Lead, products: ProductRow[], dueDate: string) {
+  function buildAndFireAllocation(lead: Lead, modalResult: AllocationModalResult) {
     if (!onAllocationCreated) return null;
-
-    const today = new Date();
-    const createdDate = today.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    const allocId  = `alloc-${Date.now()}`;
-    const refNum   = `ALO-${10100 + Math.floor(Math.random() * 9000)}`;
-
-    const allocProducts: AllocationProduct[] = products.map((p, idx) => {
-      const basePrice = p.unitPrice ?? (10 + idx * 3);
-      const catalogEntry = p.sku
-        ? mockProducts.find((c) => c.sku === p.sku)
-        : mockProducts.find((c) => c.productName.toLowerCase() === p.name.toLowerCase());
-      const inv: InventoryItem = {
-        sku:              p.sku ?? `SKU-${String(idx + 1).padStart(3, "0")}`,
-        productName:      p.name,
-        manufacturerName: "TBD",
-        qtyAvailable:     catalogEntry?.qtyAvailable ?? 0,
-        uom:              p.uom ?? catalogEntry?.uom ?? "Each",
-        uomConversions:   "N/A",
-        cost:  +(basePrice * 0.6).toFixed(2),
-        price: +basePrice.toFixed(2),
-      };
-      return {
-        sku:         inv.sku,
-        productName: p.name,
-        requiredQty: Number(p.quantity) || 0,
-        inventory:   inv,
-        tierPrices: [
-          { rangeLabel: "1–50",    suggestedPrice: basePrice,                      userPrice: basePrice },
-          { rangeLabel: "50–100",  suggestedPrice: +(basePrice * 0.95).toFixed(2), userPrice: +(basePrice * 0.95).toFixed(2) },
-          { rangeLabel: "100–500", suggestedPrice: +(basePrice * 0.90).toFixed(2), userPrice: +(basePrice * 0.90).toFixed(2) },
-          { rangeLabel: "500+",    suggestedPrice: +(basePrice * 0.85).toFixed(2), userPrice: +(basePrice * 0.85).toFixed(2) },
-        ],
-      };
-    });
-
-    const record: AllocationRecord = {
-      id:             allocId,
-      allocationRef:  refNum,
-      leadId:         lead.id,
-      contactName:    lead.contactName,
-      companyName:    lead.companyName,
-      email:          lead.email,
-      phone:          lead.phone,
-      location:       lead.location ?? "",
-      businessType:   lead.businessType,
-      leadSource:     lead.leadSource,
-      leadPriority:   lead.priority,
-      totalProducts:  products.length,
-      ownerName:      lead.assignedTo,
-      nextStepAction: `Follow-up on ${fmt(dueDate)}`,
-      dueDate:        `${dueDate}T09:00:00`,
-      status:         "Pending",
-      createdDate,
-      products:       allocProducts,
-    };
-
+    const record = buildAllocationRecord(lead, modalResult);
     onAllocationCreated(record, lead.id);
-    return allocId;
+    return record.id;
   }
 
   function handleAttemptedSave(dueDate: string) {
@@ -248,6 +193,7 @@ export function LeadsKanbanBoard({
     applyStatus(inactiveDrop.leadId, "Inactive", {
       reason:     result.reason ?? undefined,
       reasonNote: result.reasonNote ?? undefined,
+      allocationRejection: undefined,
     });
     setInactiveDrop(null);
   }
@@ -329,10 +275,10 @@ export function LeadsKanbanBoard({
     setQualifiedDrop(null);
   }
 
-  function handleAllocationSave(result: AllocationModalResult) {
+  function handleAllocationSave(result: AllocationModalResult, leadForSave: Lead) {
     if (!procurementDrop || !procurementLead) return;
 
-    const allocId = buildAndFireAllocation(procurementLead, result.products, result.dueDate);
+    const allocId = buildAndFireAllocation(leadForSave, result);
 
     applyStatus(procurementDrop.leadId, "Allocation", {
       procurementStatus:   "checking",
@@ -409,7 +355,7 @@ export function LeadsKanbanBoard({
 
       {procurementDrop && procurementLead && (
         <AllocationModal
-          leadName={procurementLead.contactName}
+          lead={procurementLead}
           onSave={handleAllocationSave}
           onCancel={() => setProcurementDrop(null)}
         />

@@ -4,17 +4,23 @@ import { useState, useRef, useEffect } from "react";
 import { ChevronDown, Check, Search } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Opportunity } from "@/lib/types";
-
-// ─── Team member config ───────────────────────────────────────────────────────
-
-export const TEAM_MEMBERS = ["All", "David", "Patrick", "Denise"] as const;
-export type TeamMember = (typeof TEAM_MEMBERS)[number];
+import { getQuoteTableStatusLabel } from "@/lib/quotes-display";
+import { cn } from "@/lib/utils";
 
 // ─── Filter options ───────────────────────────────────────────────────────────
 
-const STATUS_OPTIONS = ["Pending", "Approved", "Rejected"];
+const STATUS_OPTIONS = ["Pending", "Approved", "Approved with adjustments", "Rejected"];
 
 const OWNER_OPTIONS = ["Me", "Katie Allen", "Kevin Calamari", "All"];
+
+export type QuoteTeamQuickTab = "all" | "denise" | "walsh" | "mark";
+
+const TEAM_QUICK_TABS: { id: QuoteTeamQuickTab; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "denise", label: "Denise" },
+  { id: "walsh", label: "Walsh" },
+  { id: "mark", label: "Mark" },
+];
 
 const DATE_RANGE_OPTIONS = [
   "Today",
@@ -31,10 +37,11 @@ const DATE_RANGE_OPTIONS = [
 // ─── Stat tile colors ─────────────────────────────────────────────────────────
 
 const STAT_TILES = [
-  { key: "totalValue", label: "Total Value",  color: "#3B82F6" },
-  { key: "pending",    label: "Pending",      color: "#F59E0B" },
-  { key: "approved",   label: "Approved",     color: "#10B981" },
-  { key: "rejected",   label: "Rejected",     color: "#EF4444" },
+  { key: "totalValue", label: "Total Value", color: "#3B82F6" },
+  { key: "pending", label: "Pending", color: "#F59E0B" },
+  { key: "approved", label: "Approved", color: "#10B981" },
+  { key: "approvedAdj", label: "Approved w/ adj.", color: "#14B8A6" },
+  { key: "rejected", label: "Rejected", color: "#EF4444" },
 ] as const;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -134,8 +141,8 @@ interface QuoteFilterBarProps {
   onClearFilters: () => void;
   searchQuery: string;
   onSearchChange: (v: string) => void;
-  teamMember: TeamMember;
-  onTeamMemberChange: (v: TeamMember) => void;
+  teamQuickTab: QuoteTeamQuickTab;
+  onTeamQuickTabChange: (tab: QuoteTeamQuickTab) => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -151,11 +158,16 @@ export function QuoteFilterBar({
   onClearFilters,
   searchQuery,
   onSearchChange,
-  teamMember,
-  onTeamMemberChange,
+  teamQuickTab,
+  onTeamQuickTabChange,
 }: QuoteFilterBarProps) {
-  const pending  = viewFilteredOpportunities.filter((o) => o.quoteStatus === "pending").length;
-  const approved = viewFilteredOpportunities.filter((o) => o.quoteStatus === "approved").length;
+  const pending = viewFilteredOpportunities.filter((o) => o.quoteStatus === "pending").length;
+  const approved = viewFilteredOpportunities.filter(
+    (o) => getQuoteTableStatusLabel(o) === "Approved"
+  ).length;
+  const approvedAdj = viewFilteredOpportunities.filter(
+    (o) => getQuoteTableStatusLabel(o) === "Approved with adjustments"
+  ).length;
   const rejected = viewFilteredOpportunities.filter((o) => o.quoteStatus === "rejected").length;
   const totalValue = viewFilteredOpportunities.reduce(
     (sum, o) => sum + parseMoney(o.quoteData?.grandTotal ?? "0"),
@@ -164,9 +176,10 @@ export function QuoteFilterBar({
 
   const statsValues: Record<string, string> = {
     totalValue: formatTotal(totalValue),
-    pending:    String(pending),
-    approved:   String(approved),
-    rejected:   String(rejected),
+    pending: String(pending),
+    approved: String(approved),
+    approvedAdj: String(approvedAdj),
+    rejected: String(rejected),
   };
 
   const allActivePills = [
@@ -234,35 +247,40 @@ export function QuoteFilterBar({
         />
 
         {/* Spacer */}
-        <div className="flex-1" />
+        <div className="flex-1 min-w-2" />
 
-        {/* Team member tabs */}
-        <div className="flex items-center gap-1">
-          {TEAM_MEMBERS.map((member) => (
-            <button
-              key={member}
-              type="button"
-              onClick={() => onTeamMemberChange(member)}
-              className={`px-3 py-1.5 text-sm rounded-lg border font-semibold transition-colors ${
-                teamMember === member
-                  ? "bg-slate-900 text-white border-slate-900"
-                  : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300"
-              }`}
-            >
-              {member}
-            </button>
-          ))}
-        </div>
+        {/* Quick team tabs + search */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-1 p-0.5 rounded-lg bg-slate-100/90 border border-slate-200/80">
+            {TEAM_QUICK_TABS.map(({ id, label }) => {
+              const active = teamQuickTab === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => onTeamQuickTabChange(id)}
+                  className={cn(
+                    "px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all whitespace-nowrap",
+                    active
+                      ? "bg-white text-[#002f93] shadow-sm border border-slate-200/90"
+                      : "text-slate-600 hover:text-slate-900"
+                  )}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
 
-        {/* Search */}
-        <div className="w-64">
-          <Input
-            icon={<Search size={14} />}
-            placeholder="Search Quotes"
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="py-1.5 text-xs"
-          />
+          <div className="w-64">
+            <Input
+              icon={<Search size={14} />}
+              placeholder="Search Quotes"
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              className="py-1.5 text-xs"
+            />
+          </div>
         </div>
       </div>
 

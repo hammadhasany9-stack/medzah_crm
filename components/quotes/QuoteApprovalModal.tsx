@@ -5,6 +5,12 @@ import { X, FileSpreadsheet, Calendar, Trash2, PackageSearch } from "lucide-reac
 import { Opportunity } from "@/lib/types";
 import { useCRMShell } from "@/components/shell/CRMShellContext";
 import { AllocationRecordDetailContent } from "@/components/leads/ViewAllocationModal";
+import {
+  QuoteCommercialLogisticsShippingReadOnly,
+  QuotePricingCostBreakdown,
+  fmtUsd,
+  resolveQuotePricing,
+} from "@/components/quotes/QuoteExtendedSummary";
 
 // ─── Signature Pad ────────────────────────────────────────────────────────────
 
@@ -371,12 +377,17 @@ export function QuoteApprovalModal({
                 />
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-0.5">
-                    Grand Total
+                    Grand Total (product)
                   </p>
                   <p className="text-[13px] font-semibold text-red-500">
                     ${displayQuote.grandTotal}
                   </p>
                 </div>
+                <DetailCell
+                  label="Final Quote Total"
+                  value={fmtUsd(resolveQuotePricing(displayQuote).finalMoney)}
+                  accent="red"
+                />
                 <DetailCell
                   label="Opportunity Owner"
                   value={displayQuote.opportunityOwner}
@@ -397,6 +408,11 @@ export function QuoteApprovalModal({
                 />
                 <DetailCell label="Created Date" value={createdDisplay} />
               </div>
+            </section>
+
+            <section>
+              <SectionLabel>Commercial, Logistics &amp; Shipping</SectionLabel>
+              <QuoteCommercialLogisticsShippingReadOnly q={displayQuote} />
             </section>
 
             {/* ── Procurement File ── */}
@@ -462,6 +478,7 @@ export function QuoteApprovalModal({
                   value={`$${displayQuote.grandTotal}`}
                   bold
                 />
+                <QuotePricingCostBreakdown q={displayQuote} omitProductLine className="mt-3" />
               </div>
             </section>
 

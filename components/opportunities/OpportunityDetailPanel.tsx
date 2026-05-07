@@ -1,16 +1,16 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useTenantRouter } from "@/components/providers/TenantProvider";
 import type { LucideIcon } from "lucide-react";
 import {
   X, Eye, Pencil, Trash2,
   Mail, Phone,
   PhoneCall, Globe, UserPlus, Building2, Link2, Megaphone, Users,
   Star, Zap, HelpCircle,
-  Calendar, DollarSign, Clock, XCircle, FilePlus, ArrowRight, CheckCircle2,
+  Calendar, DollarSign,   Clock, XCircle, FilePlus, ArrowRight, CheckCircle2, AlertTriangle,
 } from "lucide-react";
-import { Opportunity, OpportunityStage, Priority, QuoteRecord, QuoteStatus } from "@/lib/types";
+import { Opportunity, OpportunityStage, Priority, QuoteRecord, QuoteStatus, closedLostReasonLabel } from "@/lib/types";
 import { isAdvanceBlockedWithoutApprovedQuote } from "@/lib/opportunity-stage-guards";
 import { QuoteApprovalRequiredDialog } from "@/components/opportunities/QuoteApprovalRequiredDialog";
 
@@ -371,7 +371,7 @@ interface OpportunityDetailPanelProps {
 
 export function OpportunityDetailPanel({ opportunity, onClose, onCreateQuote }: OpportunityDetailPanelProps) {
   const isOpen = !!opportunity;
-  const router = useRouter();
+  const router = useTenantRouter();
   const [stage, setStage] = useState<OpportunityStage>(
     opportunity?.opportunityStage ?? "Qualified"
   );
@@ -726,42 +726,62 @@ export function OpportunityDetailPanel({ opportunity, onClose, onCreateQuote }: 
               </section>
             </div>
 
-            {/* ── Sticky footer ── */}
-            <div className="flex-shrink-0 px-5 py-4 border-t border-slate-100 bg-white">
-              {opportunity.opportunityStage === "Closed Won" ? (
-                <div className="space-y-3">
-                  <div className="flex flex-col gap-1.5">
-                    <p className="text-[11px] text-slate-500 leading-tight">new customer</p>
-                    <button
-                      type="button"
-                      onClick={() => router.push("/customer-intake/create")}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-[13px] font-semibold text-slate-700 border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors"
-                    >
-                      <ArrowRight size={14} className="text-slate-500 flex-shrink-0" />
-                      Create customer intake form
-                    </button>
+            {(opportunity.opportunityStage === "Closed Won" ||
+              opportunity.opportunityStage === "Closed Lost") && (
+              <div className="flex-shrink-0 px-5 py-4 border-t border-slate-100 bg-white">
+                {opportunity.opportunityStage === "Closed Won" ? (
+                  <div className="space-y-3">
+                    <div className="flex flex-col gap-1.5">
+                      <p className="text-[11px] text-slate-500 leading-tight">new customer</p>
+                      <button
+                        type="button"
+                        onClick={() => router.push("/customer-intake/create")}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-[13px] font-semibold text-slate-700 border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors"
+                      >
+                        <ArrowRight size={14} className="text-slate-500 flex-shrink-0" />
+                        Create customer intake form
+                      </button>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <p className="text-[11px] text-slate-500 leading-tight">Already a customer</p>
+                      <button
+                        type="button"
+                        onClick={() => router.push("/contracts")}
+                        className="w-full px-4 py-2.5 text-[13px] font-semibold text-white bg-slate-900 rounded-xl hover:bg-black transition-colors"
+                      >
+                        Create contract
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-1.5">
-                    <p className="text-[11px] text-slate-500 leading-tight">Already a customer</p>
-                    <button
-                      type="button"
-                      onClick={() => router.push("/contracts")}
-                      className="w-full px-4 py-2.5 text-[13px] font-semibold text-white bg-slate-900 rounded-xl hover:bg-black transition-colors"
-                    >
-                      Create contract
-                    </button>
+                ) : (
+                  <div
+                    role="alert"
+                    className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 flex gap-3"
+                  >
+                    <AlertTriangle
+                      size={18}
+                      className="text-red-600 flex-shrink-0 mt-0.5"
+                      aria-hidden
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-red-700">
+                        Closed lost
+                      </p>
+                      <p className="text-[13px] font-semibold text-red-950 mt-1 leading-snug">
+                        {opportunity.closedLostReason
+                          ? closedLostReasonLabel(opportunity.closedLostReason)
+                          : "Reason not recorded"}
+                      </p>
+                      {!!opportunity.closedLostDescription?.trim() && (
+                        <p className="text-[12px] text-red-900/90 leading-relaxed mt-2 whitespace-pre-wrap">
+                          {opportunity.closedLostDescription.trim()}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  className="w-full bg-slate-900 hover:bg-black text-white text-sm font-semibold py-3 rounded-xl transition-colors duration-150 flex items-center justify-center gap-2"
-                >
-                  <Mail size={15} />
-                  Send Email
-                </button>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </>
         )}
       </aside>

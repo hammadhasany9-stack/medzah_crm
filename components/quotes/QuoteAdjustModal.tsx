@@ -9,6 +9,19 @@ import type { ProductCatalogItem } from "@/lib/mock-data/products";
 import { QuoteProductNamePicker } from "@/components/quotes/QuoteProductNamePicker";
 import { getAccountNamesForContactsPicker } from "@/lib/mock-data/accounts";
 import { getContactDisplayNamesForQuotePicker } from "@/lib/mock-data/contacts";
+import { computeQuoteFeeAmounts } from "@/lib/quote-pricing";
+import {
+  CARRIER_BILLING_OPTIONS,
+  DELIVERY_CHARGES_OPTIONS,
+  DELIVERY_LOCATIONS_OPTIONS,
+  EXPECTED_DEMAND_OPTIONS,
+  FREIGHT_RESPONSIBILITY_OPTIONS,
+  PAYMENT_TERMS_OPTIONS,
+  QuoteCommercialLogisticsShippingReadOnly,
+  QuotePricingCostBreakdown,
+  fmtUsd,
+  resolveQuotePricing,
+} from "@/components/quotes/QuoteExtendedSummary";
 
 // ─── Signature Pad (identical to approval modal) ──────────────────────────────
 
@@ -234,7 +247,8 @@ function AdjustModalOldQuoteView({
         <div className="grid grid-cols-2 gap-x-6 gap-y-4">
           <ReadCell label="Valid Till Date" value={validDisplay} accent="red" />
           <ReadCell label="Expected Revenue" value={opportunity.expectedRevenue} />
-          <ReadCell label="Grand Total" value={`$${q.grandTotal}`} accent="red" />
+          <ReadCell label="Grand Total (product)" value={`$${q.grandTotal}`} accent="red" />
+          <ReadCell label="Final Quote Total" value={fmtUsd(resolveQuotePricing(q).finalMoney)} accent="red" />
           <ReadCell label="Opportunity Owner" value={q.opportunityOwner} />
           <ReadCell label="Subject" value={q.subject} />
           <ReadCell label="Contact Name" value={q.contactName} />
@@ -246,6 +260,11 @@ function AdjustModalOldQuoteView({
           <ReadCell label="SKU / Quantity" value={String(q.items.length)} />
           <ReadCell label="Shipping Method" value={q.shippingMethod} />
         </div>
+      </section>
+
+      <section>
+        <SectionLabel>Commercial, Logistics &amp; Shipping</SectionLabel>
+        <QuoteCommercialLogisticsShippingReadOnly q={q} />
       </section>
 
       <section>
@@ -280,8 +299,9 @@ function AdjustModalOldQuoteView({
           <div className="flex justify-between"><span>Tax ($)</span><span>{q.tax || "0"}</span></div>
           <div className="flex justify-between"><span>Adjustment</span><span>{q.adjustment || "—"}</span></div>
           <div className="flex justify-between font-bold text-slate-900 border-t border-slate-200 pt-1.5">
-            <span>Grand Total ($)</span><span>${q.grandTotal}</span>
+            <span>Grand Total ($) — product</span><span>${q.grandTotal}</span>
           </div>
+          <QuotePricingCostBreakdown q={q} omitProductLine className="mt-3" />
         </div>
       </section>
 
@@ -393,6 +413,44 @@ export function QuoteAdjustModal({ opportunity, onSubmit, onCancel }: QuoteAdjus
   const [adjustment, setAdjustment] = useState(() => opportunity.quoteData?.adjustment || "0");
   const [agreed,     setAgreed]     = useState(false);
 
+  const [paymentTerms, setPaymentTerms] = useState(() => opportunity.quoteData?.paymentTerms ?? "");
+  const [expectedDemand, setExpectedDemand] = useState(() => opportunity.quoteData?.expectedDemand ?? "");
+  const [deliveryLocations, setDeliveryLocations] = useState(() => opportunity.quoteData?.deliveryLocations ?? "");
+  const [deliveryLocationCount, setDeliveryLocationCount] = useState(
+    () => opportunity.quoteData?.deliveryLocationCount ?? ""
+  );
+  const [firstOrderDeliveryDate, setFirstOrderDeliveryDate] = useState(() =>
+    opportunity.quoteData?.firstOrderDeliveryDate?.split("T")[0] ?? ""
+  );
+  const [freightResponsibility, setFreightResponsibility] = useState(
+    () => opportunity.quoteData?.freightResponsibility ?? ""
+  );
+  const [deliveryCharges, setDeliveryCharges] = useState(() => opportunity.quoteData?.deliveryCharges ?? "");
+  const [carrierBillingMethod, setCarrierBillingMethod] = useState(
+    () => opportunity.quoteData?.carrierBillingMethod ?? ""
+  );
+  const [customerShippingAccountNumber, setCustomerShippingAccountNumber] = useState(
+    () => opportunity.quoteData?.customerShippingAccountNumber ?? ""
+  );
+  const [salesCommissionPercent, setSalesCommissionPercent] = useState(
+    () => opportunity.quoteData?.salesCommissionPercent ?? ""
+  );
+
+  useEffect(() => {
+    const qd = opportunity.quoteData;
+    if (!qd) return;
+    setPaymentTerms(qd.paymentTerms ?? "");
+    setExpectedDemand(qd.expectedDemand ?? "");
+    setDeliveryLocations(qd.deliveryLocations ?? "");
+    setDeliveryLocationCount(qd.deliveryLocationCount ?? "");
+    setFirstOrderDeliveryDate(qd.firstOrderDeliveryDate?.split("T")[0] ?? "");
+    setFreightResponsibility(qd.freightResponsibility ?? "");
+    setDeliveryCharges(qd.deliveryCharges ?? "");
+    setCarrierBillingMethod(qd.carrierBillingMethod ?? "");
+    setCustomerShippingAccountNumber(qd.customerShippingAccountNumber ?? "");
+    setSalesCommissionPercent(qd.salesCommissionPercent ?? "");
+  }, [opportunity.id]);
+
   // ── Derived totals ────────────────────────────────────────────────────────
 
   const subtotal   = items.reduce((s, it) => s + parseNum(it.amount), 0);
@@ -441,6 +499,9 @@ export function QuoteAdjustModal({ opportunity, onSubmit, onCancel }: QuoteAdjus
   function handleSubmit() {
     const q = opportunity.quoteData;
     if (!q) return;
+    const gtStr = fmtNum(grandTotal);
+    const feeCalc = computeQuoteFeeAmounts(gtStr, salesCommissionPercent || "0");
+
     const updatedQuoteData: QuoteData = {
       ...q,
       subject,
@@ -455,7 +516,24 @@ export function QuoteAdjustModal({ opportunity, onSubmit, onCancel }: QuoteAdjus
       discount,
       tax,
       adjustment,
-      grandTotal: fmtNum(grandTotal),
+      grandTotal: gtStr,
+      paymentTerms,
+      expectedDemand,
+      deliveryLocations,
+      deliveryLocationCount,
+      firstOrderDeliveryDate: firstOrderDeliveryDate
+        ? `${firstOrderDeliveryDate}T12:00:00.000Z`
+        : q.firstOrderDeliveryDate,
+      freightResponsibility,
+      deliveryCharges,
+      carrierBillingMethod,
+      customerShippingAccountNumber,
+      salesCommissionPercent,
+      overheadInfrastructurePercent: feeCalc.overheadInfrastructurePercent,
+      overheadAmount: feeCalc.overheadAmount,
+      salesCommissionAmount: feeCalc.salesCommissionAmount,
+      finalQuoteTotal: feeCalc.finalQuoteTotal,
+      freightCostAmount: "0",
     };
     onSubmit({
       ...opportunity,
@@ -473,6 +551,18 @@ export function QuoteAdjustModal({ opportunity, onSubmit, onCancel }: QuoteAdjus
   const createdDisplay    = opportunity.createdDate || "—";
 
   if (!quoteData) return null;
+
+  const feesLive = computeQuoteFeeAmounts(fmtNum(grandTotal), salesCommissionPercent || "0");
+  const feePreviewData: QuoteData = {
+    ...quoteData,
+    grandTotal: fmtNum(grandTotal),
+    salesCommissionPercent,
+    freightCostAmount: "0",
+    overheadInfrastructurePercent: feesLive.overheadInfrastructurePercent,
+    overheadAmount: feesLive.overheadAmount,
+    salesCommissionAmount: feesLive.salesCommissionAmount,
+    finalQuoteTotal: feesLive.finalQuoteTotal,
+  };
 
   return (
     <>
@@ -607,6 +697,97 @@ export function QuoteAdjustModal({ opportunity, onSubmit, onCancel }: QuoteAdjus
                 <ReadCell label="Lead Source"        value={opportunity.leadSource} />
                 <ReadCell label="Created Date"       value={createdDisplay} />
                 <ReadCell label="SKU / Quantity"     value={String(items.length)} />
+                <ReadCell label="Grand Total (product)" value={`$${fmtNum(grandTotal)}`} accent="red" />
+                <ReadCell
+                  label="Final Quote Total"
+                  value={fmtUsd(resolveQuotePricing(feePreviewData).finalMoney)}
+                  accent="red"
+                />
+              </div>
+            </section>
+
+            <section>
+              <SectionLabel>Commercial Details</SectionLabel>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                <PickerSelect
+                  label="Payment Terms"
+                  value={paymentTerms}
+                  onChange={setPaymentTerms}
+                  options={[...PAYMENT_TERMS_OPTIONS]}
+                  placeholder="Select payment terms"
+                />
+                <PickerSelect
+                  label="Expected Demand"
+                  value={expectedDemand}
+                  onChange={setExpectedDemand}
+                  options={[...EXPECTED_DEMAND_OPTIONS]}
+                  placeholder="Select expected demand"
+                />
+              </div>
+            </section>
+
+            <section>
+              <SectionLabel>Logistics &amp; Fulfilment</SectionLabel>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-4">
+                <PickerSelect
+                  label="Delivery locations"
+                  value={deliveryLocations}
+                  onChange={setDeliveryLocations}
+                  options={[...DELIVERY_LOCATIONS_OPTIONS]}
+                  placeholder="Select delivery type"
+                />
+                {deliveryLocations === "Multi-site" ? (
+                  <EditField
+                    label="Number of delivery locations"
+                    type="number"
+                    value={deliveryLocationCount}
+                    onChange={setDeliveryLocationCount}
+                    placeholder="Quantity"
+                  />
+                ) : (
+                  <div className="hidden sm:block" aria-hidden />
+                )}
+                <EditField
+                  label="Delivery timeline for first order"
+                  type="date"
+                  value={firstOrderDeliveryDate}
+                  onChange={setFirstOrderDeliveryDate}
+                />
+              </div>
+            </section>
+
+            <section>
+              <SectionLabel>Shipping Details</SectionLabel>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                <PickerSelect
+                  label="Freight responsibility"
+                  value={freightResponsibility}
+                  onChange={setFreightResponsibility}
+                  options={[...FREIGHT_RESPONSIBILITY_OPTIONS]}
+                  placeholder="Select"
+                />
+                <PickerSelect
+                  label="Delivery Charges"
+                  value={deliveryCharges}
+                  onChange={setDeliveryCharges}
+                  options={[...DELIVERY_CHARGES_OPTIONS]}
+                  placeholder="Select"
+                />
+                <PickerSelect
+                  label="Carrier billing"
+                  value={carrierBillingMethod}
+                  onChange={setCarrierBillingMethod}
+                  options={[...CARRIER_BILLING_OPTIONS]}
+                  placeholder="Select"
+                />
+                {carrierBillingMethod === "Customer shipping account" ? (
+                  <EditField
+                    label="Customer shipping account #"
+                    value={customerShippingAccountNumber}
+                    onChange={setCustomerShippingAccountNumber}
+                    placeholder="Account number"
+                  />
+                ) : null}
               </div>
             </section>
 
@@ -727,15 +908,30 @@ export function QuoteAdjustModal({ opportunity, onSubmit, onCancel }: QuoteAdjus
                   </div>
                 ))}
 
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-[12px] text-slate-500 text-right flex-shrink-0 ml-auto pr-4" style={{ minWidth: 120 }}>
+                    Sales commission (%)
+                  </span>
+                  <input
+                    value={salesCommissionPercent}
+                    onChange={(e) => setSalesCommissionPercent(e.target.value)}
+                    placeholder="0"
+                    inputMode="decimal"
+                    className="w-[140px] flex-shrink-0 border border-slate-200 rounded px-3 py-1.5 text-[13px] text-right text-slate-700 bg-white focus:outline-none focus:ring-1 focus:ring-[#002f93]"
+                  />
+                </div>
+
                 {/* Grand Total — auto-calculated */}
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-[12px] font-bold text-slate-800 text-right flex-shrink-0 ml-auto pr-4" style={{ minWidth: 120 }}>
-                    Grand Total ($)
+                    Grand Total ($) — product
                   </span>
                   <div className="w-[140px] flex-shrink-0 border border-slate-300 rounded px-3 py-1.5 text-[13px] text-right font-bold text-slate-900 bg-slate-50">
                     ${fmtNum(grandTotal)}
                   </div>
                 </div>
+
+                <QuotePricingCostBreakdown q={feePreviewData} omitProductLine className="mt-2" />
               </div>
             </section>
 

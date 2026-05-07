@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { Suspense } from "react";
 import { Bell, HelpCircle, Plus, Search, RotateCcw } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { useCRMShell } from "./CRMShellContext";
 import { resetDemoAndReload } from "@/lib/reset-demo-data";
+import { InboxShellNav } from "@/components/inbox/InboxShellNav";
 
 interface TopNavBarProps {
   title: string;
@@ -16,6 +18,7 @@ interface TopNavBarProps {
   showTabs?: boolean;
   showSearch?: boolean;
   showCreate?: boolean;
+  showInboxNav?: boolean;
   onCreateClick?: () => void;
 }
 
@@ -29,6 +32,7 @@ export function TopNavBar({
   showTabs = true,
   showSearch = true,
   showCreate = true,
+  showInboxNav = false,
   onCreateClick,
 }: TopNavBarProps) {
   const { ownerTab, setOwnerTab } = useCRMShell();
@@ -43,9 +47,26 @@ export function TopNavBar({
     }
   }
 
+  if (showInboxNav) {
+    return (
+      <header className="sticky top-0 z-20 print:hidden shadow-[0_2px_8px_rgba(0,0,0,0.12)]">
+        <Suspense
+          fallback={
+            <div
+              className="min-h-[56px] bg-[#0F172A] border-b border-white/10"
+              aria-hidden
+            />
+          }
+        >
+          <InboxShellNav composeHref={createHref} />
+        </Suspense>
+      </header>
+    );
+  }
+
   return (
-    <header className="sticky top-0 z-20 bg-white border-b border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)] print:hidden">
-      <div className="flex items-center gap-4 px-6 h-[60px]">
+    <header className="sticky top-0 z-20 print:hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+      <div className="flex items-center gap-4 px-6 h-[60px] bg-white border-b border-slate-200">
         {/* Title + toggle */}
         <div className="flex items-center gap-3 flex-shrink-0">
           <h2 className="text-xl font-bold tracking-tight text-slate-900">{title}</h2>

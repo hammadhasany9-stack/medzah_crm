@@ -1,7 +1,7 @@
 "use client";
 
 import { useDroppable } from "@dnd-kit/core";
-import Link from "next/link";
+import { TenantLink } from "@/components/providers/TenantLink";
 import { Plus, Inbox } from "lucide-react";
 import { Lead, KanbanColumn as KanbanColumnType } from "@/lib/types";
 import { DraggableLeadCard } from "./DraggableLeadCard";
@@ -35,13 +35,13 @@ export function KanbanColumn({ column, leads, onLeadClick }: KanbanColumnProps) 
           </span>
         </div>
         {column.id === "New" && (
-          <Link
+          <TenantLink
             href="/leads/create"
             className="w-6 h-6 rounded-md flex-shrink-0 flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
             title="Add new lead"
           >
             <Plus size={13} />
-          </Link>
+          </TenantLink>
         )}
       </div>
 

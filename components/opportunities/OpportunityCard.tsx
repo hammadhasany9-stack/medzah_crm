@@ -8,7 +8,7 @@ import {
   HelpCircle, Calendar, DollarSign,
   Clock, XCircle, FilePlus, CheckCircle2, X, RefreshCw, Eye,
 } from "lucide-react";
-import { Opportunity, Priority } from "@/lib/types";
+import { Opportunity, Priority, closedLostReasonLabel } from "@/lib/types";
 import { ViewQuoteModal } from "@/components/quotes/ViewQuoteModal";
 
 // ─── Source badge ─────────────────────────────────────────────────────────────
@@ -323,6 +323,24 @@ export function OpportunityCard({
               <p className="text-[11px] text-red-700 leading-relaxed line-clamp-2">
                 {opportunity.quoteRejectionReason}
               </p>
+            </div>
+          )}
+
+          {isClosedLost && (
+            <div className="bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-red-500 mb-0.5">
+                Closed lost · Reason
+              </p>
+              <p className="text-[12px] font-semibold text-red-900 leading-snug">
+                {opportunity.closedLostReason
+                  ? closedLostReasonLabel(opportunity.closedLostReason)
+                  : "—"}
+              </p>
+              {!!opportunity.closedLostDescription?.trim() && (
+                <p className="text-[11px] text-red-800/90 leading-relaxed mt-1 line-clamp-2">
+                  {opportunity.closedLostDescription.trim()}
+                </p>
+              )}
             </div>
           )}
         </div>

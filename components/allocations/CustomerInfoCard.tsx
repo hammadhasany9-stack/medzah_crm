@@ -1,7 +1,7 @@
 "use client";
 
-import { Mail, Phone, MapPin, Briefcase, Calendar, User } from "lucide-react";
-import { AllocationRecord } from "@/lib/types";
+import { Mail, Phone, MapPin, Briefcase, Calendar, User, Users } from "lucide-react";
+import { AllocationRecord, resolveAllocationCustomerType } from "@/lib/types";
 
 interface CustomerInfoCardProps {
   record: AllocationRecord;
@@ -26,12 +26,18 @@ function InfoField({ icon: Icon, label, value }: {
 }
 
 export function CustomerInfoCard({ record }: CustomerInfoCardProps) {
+  const customerTypeLabel =
+    resolveAllocationCustomerType(record) === "existing"
+      ? "Existing customer"
+      : "New customer";
+
   return (
     <div className="bg-white rounded-xl border border-slate-100 shadow-sm px-6 py-5">
       <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-4">Customer Information</p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        <InfoField icon={Mail}      label="Email"         value={record.email} />
+        <InfoField icon={Users}   label="Customer type" value={customerTypeLabel} />
+        <InfoField icon={Mail}    label="Email"         value={record.email} />
         <InfoField icon={Phone}     label="Phone"         value={record.phone} />
         <InfoField icon={MapPin}    label="Location"      value={record.location} />
         <InfoField icon={Briefcase} label="Business Type" value={record.businessType} />
