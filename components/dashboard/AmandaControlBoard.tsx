@@ -465,7 +465,7 @@ export function AmandaControlBoard() {
                 <th className="px-3 py-2">Customer</th>
                 <th className="px-3 py-2">Start</th>
                 <th className="px-3 py-2">End</th>
-                <th className="px-3 py-2">Agreed pricing</th>
+                <th className="px-3 py-2">Notes</th>
                 <th className="px-3 py-2">Renewal date</th>
                 <th className="px-3 py-2 text-right">Days to end</th>
               </tr>
