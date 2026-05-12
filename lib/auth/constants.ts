@@ -32,7 +32,6 @@ export function isAllowedLoginEmail(email: string): boolean {
 
 export const AMANDA_ALLOWED_SEGMENTS = new Set([
   "dashboard",
-  "allocation",
   "quotes",
   "sales-orders",
   "account",
@@ -56,7 +55,6 @@ export const CRM_ROOT_SEGMENTS = new Set([
   "opportunity",
   "quotes",
   "sales-orders",
-  "allocation",
   "account",
   "contact",
   "customer-intake",

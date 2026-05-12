@@ -11,7 +11,6 @@ import {
   Target,
   FileText,
   ShoppingCart,
-  Package,
   Building2,
   Users,
   ClipboardList,
@@ -36,7 +35,6 @@ const sharedSalesLinks = [
 ];
 
 const customerLinks = [
-  { href: "/allocation", label: "Allocation", icon: Package },
   { href: "/account", label: "Account", icon: Building2 },
   { href: "/contact", label: "Contact", icon: Users },
   { href: "/customer-intake", label: "Customer Intake", icon: ClipboardList },
@@ -62,8 +60,8 @@ function NavItem({
       className={cn(
         "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150",
         active
-          ? "bg-[rgba(0,47,147,0.2)] text-white border-l-2 border-[#002f93] pl-[10px]"
-          : "text-slate-400 hover:bg-white/5 hover:text-slate-200 border-l-2 border-transparent pl-[10px]"
+          ? "bg-[rgba(0,47,147,0.08)] text-[#002f93] border-l-2 border-[#002f93] pl-[10px]"
+          : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 border-l-2 border-transparent pl-[10px]"
       )}
     >
       <Icon size={16} className="flex-shrink-0" />
@@ -111,15 +109,15 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="fixed inset-y-0 left-0 w-64 bg-[#0F172A] flex flex-col z-30 print:hidden">
-      <div className="px-5 py-5 border-b border-white/5">
+    <aside className="fixed inset-y-0 left-0 w-64 bg-white flex flex-col z-30 print:hidden border-r border-slate-200">
+      <div className="px-5 py-5 border-b border-slate-200">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-[#002f93] flex items-center justify-center">
             <LayoutDashboard size={16} className="text-white" />
           </div>
           <div>
-            <span className="text-white font-bold text-base tracking-tight">Medzah</span>
-            <span className="ml-1.5 text-xs font-semibold text-slate-500 uppercase tracking-widest">
+            <span className="text-slate-900 font-bold text-base tracking-tight">Medzah</span>
+            <span className="ml-1.5 text-xs font-semibold text-slate-400 uppercase tracking-widest">
               CRM
             </span>
           </div>
@@ -137,7 +135,7 @@ export function Sidebar() {
         </div>
 
         <div>
-          <p className="px-3 mb-1.5 text-xs font-semibold uppercase tracking-widest text-slate-600">
+          <p className="px-3 mb-1.5 text-xs font-semibold uppercase tracking-widest text-slate-400">
             Sales
           </p>
           <div className="space-y-0.5">
@@ -154,7 +152,7 @@ export function Sidebar() {
         </div>
 
         <div>
-          <p className="px-3 mb-1.5 text-xs font-semibold uppercase tracking-widest text-slate-600">
+          <p className="px-3 mb-1.5 text-xs font-semibold uppercase tracking-widest text-slate-400">
             Customer
           </p>
           <div className="space-y-0.5">
@@ -171,15 +169,15 @@ export function Sidebar() {
         </div>
       </nav>
 
-      <div className="border-t border-white/5">
-        <div className="mx-3 my-3 bg-[#1E293B] rounded-xl p-3">
+      <div className="border-t border-slate-200">
+        <div className="mx-3 my-3 bg-slate-100 rounded-xl p-3">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-[#002f93] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
               {profile.initials}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-white truncate">{profile.name}</p>
-              <p className="text-xs text-slate-400 truncate">{profile.title}</p>
+              <p className="text-sm font-semibold text-slate-900 truncate">{profile.name}</p>
+              <p className="text-xs text-slate-500 truncate">{profile.title}</p>
             </div>
           </div>
         </div>
@@ -202,7 +200,7 @@ export function Sidebar() {
           <button
             type="button"
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-400 hover:bg-white/5 hover:text-red-400 rounded-lg transition-all duration-150 border-l-2 border-transparent pl-[10px]"
+            className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-500 hover:bg-slate-100 hover:text-red-500 rounded-lg transition-all duration-150 border-l-2 border-transparent pl-[10px]"
           >
             <LogOut size={16} />
             <span>Logout</span>

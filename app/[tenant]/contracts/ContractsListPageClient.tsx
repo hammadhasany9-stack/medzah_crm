@@ -10,8 +10,7 @@ import type { Contract, ContractStatus } from "@/lib/types";
 import { contractStatusLabel, formatEffectiveFrom } from "@/components/contracts/contract-format";
 import { ContractPrintModal } from "@/components/contracts/ContractPrintModal";
 import { cn } from "@/lib/utils";
-
-const CONTRACT_TYPES = ["All types", "Supply & Service", "Master Service", "Pilot"];
+import { CONTRACT_TEMPLATE_OPTIONS, downloadContractBinary } from "@/lib/contract-templates";
 
 function statusBadgeClass(s: ContractStatus): string {
   switch (s) {
@@ -51,6 +50,15 @@ export default function ContractsListPageClient() {
     () => new Set()
   );
 
+  const typeFilterOptions = useMemo(() => {
+    const labels = new Set<string>();
+    CONTRACT_TEMPLATE_OPTIONS.forEach((o) => labels.add(o.label));
+    contracts.forEach((c) => {
+      if (c.type?.trim()) labels.add(c.type.trim());
+    });
+    return ["All types", ...Array.from(labels).sort((a, b) => a.localeCompare(b))];
+  }, [contracts]);
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
     return contracts.filter((c) => {
@@ -89,6 +97,10 @@ export default function ContractsListPageClient() {
       `Send approved contract ${c.contractRef} (“${c.name || "Untitled"}”) to the customer by email (demo).`
     );
     setShowSaveDocumentAfterEmail((prev) => new Set(prev).add(c.id));
+  }
+
+  function openContractDownload(c: Contract) {
+    if (!downloadContractBinary(c)) setPrintContract(c);
   }
 
   return (
@@ -143,7 +155,7 @@ export default function ContractsListPageClient() {
             onChange={(e) => setTypeFilter(e.target.value)}
             className="text-sm border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#002f93]/30"
           >
-            {CONTRACT_TYPES.map((t) => (
+            {typeFilterOptions.map((t) => (
               <option key={t} value={t}>
                 {t}
               </option>
@@ -261,7 +273,7 @@ export default function ContractsListPageClient() {
                         <>
                           <button
                             type="button"
-                            onClick={() => setPrintContract(c)}
+                            onClick={() => openContractDownload(c)}
                             className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                           >
                             <Download size={12} />
@@ -270,7 +282,7 @@ export default function ContractsListPageClient() {
                           {showSaveDocumentAfterEmail.has(c.id) ? (
                             <button
                               type="button"
-                              onClick={() => setPrintContract(c)}
+                              onClick={() => openContractDownload(c)}
                               className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                             >
                               <Save size={12} />

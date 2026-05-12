@@ -372,7 +372,7 @@ export function ContactFormFields({
               </option>
               {eligibleOpportunities.map((o) => (
                 <option key={o.id} value={o.id}>
-                  {o.opportunityRef} — {o.opportunityName}
+                  {o.opportunityRef} — {o.accountName}
                 </option>
               ))}
             </select>

@@ -51,6 +51,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(dest, request.url));
   }
 
+  if (pathname.startsWith("/crm-onboarding")) {
+    if (!session) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+    return NextResponse.next();
+  }
+
   const parts = pathname.split("/").filter(Boolean);
   const first = parts[0];
 

@@ -15,7 +15,7 @@ const LEAD_SOURCES  = ["None", "Cold Call", "Internal Referral", "External Refer
 const LEAD_OWNERS   = ["Katie Allen", "Kevin Calamari", "Unassigned"];
 const CUSTOMER_FOR  = ["None", "Medzah", "Nexkara"];
 const PRIORITIES: Priority[]   = ["Hot", "Warm", "Cold"];
-const STATUSES: LeadStatus[]   = ["New", "Attempted Contact", "Contacted", "Allocation", "Qualified", "Allocation on hold", "Inactive"];
+const STATUSES: LeadStatus[]   = ["New", "Attempted Contact", "Contacted", "Qualified", "Inactive"];
 const INDUSTRIES    = ["None", "Healthcare", "Retail", "Hospitality", "Education", "Real Estate", "Technology", "Finance", "Construction", "Other"];
 
 // ─── Field components ─────────────────────────────────────────────────────────

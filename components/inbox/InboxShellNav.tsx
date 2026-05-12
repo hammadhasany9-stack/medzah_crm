@@ -69,7 +69,7 @@ function packInboxQuery(
 function FolderCount({ fid }: { fid: MailFolderId }) {
   const n = countThreadsInFolder(fid);
   return (
-    <span className="ml-2 min-w-[1.125rem] text-center rounded-md bg-white/12 px-1.5 py-0.5 text-[10px] font-bold text-slate-200 tabular-nums leading-none shrink-0">
+    <span className="ml-2 min-w-[1.125rem] text-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600 tabular-nums leading-none shrink-0">
       {n}
     </span>
   );
@@ -83,7 +83,7 @@ function ViewCountCell({ vf }: { vf: MailboxViewFilterId }) {
         ? countThreadsAllMessages()
         : countThreadsForMailboxView(vf);
   return (
-    <span className="ml-2 min-w-[1.125rem] text-center rounded-md bg-white/12 px-1.5 py-0.5 text-[10px] font-bold text-slate-200 tabular-nums leading-none shrink-0">
+    <span className="ml-2 min-w-[1.125rem] text-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600 tabular-nums leading-none shrink-0">
       {n}
     </span>
   );
@@ -92,7 +92,7 @@ function ViewCountCell({ vf }: { vf: MailboxViewFilterId }) {
 function LabelCount({ lid }: { lid: MailLabelId }) {
   const n = countThreadsForLabel(lid);
   return (
-    <span className="ml-2 min-w-[1.125rem] text-center rounded-md bg-white/12 px-1.5 py-0.5 text-[10px] font-bold text-slate-200 tabular-nums leading-none shrink-0">
+    <span className="ml-2 min-w-[1.125rem] text-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600 tabular-nums leading-none shrink-0">
       {n}
     </span>
   );
@@ -117,7 +117,7 @@ function SectionHeader({
         <button
           type="button"
           onClick={noopAdd}
-          className="p-1 rounded-md text-slate-500 hover:bg-white/10 hover:text-slate-200 transition-colors shrink-0"
+          className="p-1 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors shrink-0"
           aria-label={`Add ${title}`}
           title="Add"
         >
@@ -139,7 +139,7 @@ export function InboxShellNav({ composeHref }: InboxShellNavProps) {
       aria-label="Sales inbox navigation"
       className={cn(
         "flex items-center gap-3 px-3 sm:px-4 min-h-[56px] py-2",
-        "bg-[#0F172A] border-b border-white/10 overflow-x-auto scrollbar-thin text-slate-200"
+        "bg-white border-b border-slate-200 overflow-x-auto scrollbar-thin text-slate-700"
       )}
     >
       <Link
@@ -147,17 +147,17 @@ export function InboxShellNav({ composeHref }: InboxShellNavProps) {
         className={cn(
           "flex items-center gap-2 flex-shrink-0 rounded-lg px-3 py-2 text-sm font-semibold whitespace-nowrap",
           "bg-[#002f93] text-white shadow-sm hover:bg-[#0038b3] transition-colors",
-          "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0F172A]"
+          "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#002f93]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
         )}
       >
         <SquarePen size={18} aria-hidden />
         Compose
       </Link>
 
-      <div className="h-8 w-px bg-white/10 flex-shrink-0" aria-hidden />
+      <div className="h-8 w-px bg-slate-200 flex-shrink-0" aria-hidden />
 
       {/* FOLDERS */}
-      <div className="flex items-center gap-2 flex-shrink-0 py-1 pr-3 border-r border-white/10">
+      <div className="flex items-center gap-2 flex-shrink-0 py-1 pr-3 border-r border-slate-200">
         <SectionHeader title="folders" showAdd />
         <div className="flex items-center gap-1">
           {FOLDERS.map(({ id: fid, label }) => (
@@ -170,8 +170,8 @@ export function InboxShellNav({ composeHref }: InboxShellNavProps) {
               className={cn(
                 "flex items-center flex-shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-medium whitespace-nowrap transition-colors border border-transparent",
                 folder === fid
-                  ? "bg-white/[0.12] text-white border-white/15 ring-1 ring-[#002f93]/55"
-                  : "text-slate-400 hover:bg-white/[0.06] hover:text-slate-100"
+                  ? "bg-[rgba(0,47,147,0.08)] text-[#002f93] border-[#002f93]/20 ring-1 ring-[#002f93]/40"
+                  : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
               )}
             >
               {label}
@@ -182,7 +182,7 @@ export function InboxShellNav({ composeHref }: InboxShellNavProps) {
       </div>
 
       {/* VIEWS */}
-      <div className="flex items-center gap-2 flex-shrink-0 py-1 pr-3 border-r border-white/10">
+      <div className="flex items-center gap-2 flex-shrink-0 py-1 pr-3 border-r border-slate-200">
         <SectionHeader title="views" />
         <div className="flex items-center gap-1">
           {VIEWS.map(({ id: vid, label }) => (
@@ -195,8 +195,8 @@ export function InboxShellNav({ composeHref }: InboxShellNavProps) {
               className={cn(
                 "flex items-center flex-shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-medium whitespace-nowrap transition-colors border border-transparent",
                 vf === vid
-                  ? "bg-white/[0.12] text-white border-white/15 ring-1 ring-[#002f93]/55"
-                  : "text-slate-400 hover:bg-white/[0.06] hover:text-slate-100"
+                  ? "bg-[rgba(0,47,147,0.08)] text-[#002f93] border-[#002f93]/20 ring-1 ring-[#002f93]/40"
+                  : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
               )}
             >
               {label}
@@ -216,8 +216,8 @@ export function InboxShellNav({ composeHref }: InboxShellNavProps) {
             className={cn(
               "flex-shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors border border-transparent",
               !ml
-                ? "bg-white/[0.12] text-white border-white/15 ring-1 ring-[#002f93]/55"
-                : "text-slate-500 hover:bg-white/[0.06] hover:text-slate-300"
+                ? "bg-[rgba(0,47,147,0.08)] text-[#002f93] border-[#002f93]/20 ring-1 ring-[#002f93]/40"
+                : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
             )}
           >
             All
@@ -230,8 +230,8 @@ export function InboxShellNav({ composeHref }: InboxShellNavProps) {
               className={cn(
                 "flex items-center flex-shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-medium whitespace-nowrap transition-colors border border-transparent",
                 ml === lid
-                  ? "bg-white/[0.12] text-white border-white/15 ring-1 ring-[#002f93]/55"
-                  : "text-slate-400 hover:bg-white/[0.06] hover:text-slate-100"
+                  ? "bg-[rgba(0,47,147,0.08)] text-[#002f93] border-[#002f93]/20 ring-1 ring-[#002f93]/40"
+                  : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
               )}
             >
               {label}

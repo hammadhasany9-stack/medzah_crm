@@ -6,6 +6,7 @@ import { mockLeads } from "@/lib/mock-data/leads";
 import { mockAllocations } from "@/lib/mock-data/allocations";
 import { INITIAL_CONTRACTS, loadContracts, saveContracts } from "@/lib/mock-data/contracts";
 import { Opportunity, Lead, AllocationRecord, Contract } from "@/lib/types";
+import { normalizeLeadsList } from "@/lib/leads-normalize";
 
 export type OwnerTab = "my-leads" | "team";
 
@@ -58,7 +59,7 @@ export function CRMShellProvider({ children }: { children: React.ReactNode }) {
     loadFromStorage<Opportunity>(OPPS_KEY, mockOpportunities)
   );
   const [leads, setLeads] = useState<Lead[]>(() =>
-    loadFromStorage<Lead>(LEADS_KEY, mockLeads)
+    normalizeLeadsList(loadFromStorage<Lead>(LEADS_KEY, mockLeads))
   );
   const [allocations, setAllocations] = useState<AllocationRecord[]>(() =>
     loadFromStorage<AllocationRecord>(ALLOCATIONS_KEY, mockAllocations)

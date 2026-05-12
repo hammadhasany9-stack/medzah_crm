@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTenantRouter } from "@/components/providers/TenantProvider";
 import { TenantLink } from "@/components/providers/TenantLink";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
 import { useCRMShell } from "@/components/shell/CRMShellContext";
 import type { Contract, Opportunity } from "@/lib/types";
 import {
   buildNewContract,
   customerSnapshotFromOpportunity,
+  freightResponsibilityToShipping,
   lineItemsFromQuoteData,
+  proposalSnapshotFromQuoteData,
 } from "@/lib/mock-data/contracts";
 import { getAccountByName, type AccountRecord } from "@/lib/mock-data/accounts";
 import { getContactByAccountAndName, type ContactRecord } from "@/lib/mock-data/contacts";
@@ -20,14 +22,36 @@ import {
   PrimeContactBlock,
   PrimeQuoteBlock,
 } from "@/components/contracts/ContractPrimeBlocks";
+import {
+  CONTRACT_TEMPLATE_OPTIONS,
+  findTemplateByLabel,
+  openContractTemplateDownload,
+} from "@/lib/contract-templates";
+import {
+  CARRIER_BILLING_OPTIONS,
+  DELIVERY_CHARGES_OPTIONS,
+  DELIVERY_LOCATIONS_OPTIONS,
+  EXPECTED_DEMAND_OPTIONS,
+  FREIGHT_RESPONSIBILITY_OPTIONS,
+  PAYMENT_TERMS_OPTIONS,
+} from "@/components/quotes/QuoteExtendedSummary";
 
-const CONTRACT_TYPES = ["Supply & Service", "Master Service", "Pilot", "MSA", "Other"];
 const TERMS = ["3 months", "6 months", "1 year", "2 years", "3 years"];
+const UPLOAD_WARN_BYTES = 4 * 1024 * 1024;
 
 const inputCls =
   "w-full px-3 py-2 text-[13px] text-slate-800 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#002f93]/30 focus:border-[#002f93] bg-white";
 const selectCls =
   "w-full appearance-none px-3 py-2 text-[13px] border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#002f93]/30 focus:border-[#002f93] bg-white cursor-pointer";
+
+function catalogIncludes(options: readonly string[], value: string): boolean {
+  return options.some((o) => o === value);
+}
+
+function resolvedFreightDisplay(c: Contract): string {
+  if (c.freightResponsibility.trim() !== "") return c.freightResponsibility;
+  return c.shippingResponsibility === "Buyer" ? "Customer pays freight" : "We cover freight";
+}
 
 function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
@@ -123,6 +147,7 @@ export function ContractForm({ contractId }: { contractId?: string }) {
   const [primeOpp, setPrimeOpp] = useState<Opportunity | null>(null);
   const [primeAccount, setPrimeAccount] = useState<AccountRecord | null>(null);
   const [primeContact, setPrimeContact] = useState<ContactRecord | null>(null);
+  const contractFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (contractId) {
@@ -171,7 +196,7 @@ export function ContractForm({ contractId }: { contractId?: string }) {
     () =>
       eligibleOpps.map((o) => ({
         value: o.id,
-        label: `${o.opportunityName} (${o.id})`,
+        label: `${o.accountName} (${o.id})`,
       })),
     [eligibleOpps]
   );
@@ -198,6 +223,89 @@ export function ContractForm({ contractId }: { contractId?: string }) {
     setC((prev) => (prev ? { ...prev, [key]: value, updatedAt: new Date().toISOString() } : null));
   }
 
+  function handleContractTypeChange(label: string) {
+    const tpl = findTemplateByLabel(label);
+    setC((prev) =>
+      prev
+        ? {
+            ...prev,
+            type: label,
+            contractTemplateFile: tpl ? tpl.fileName : prev.contractTemplateFile,
+            updatedAt: new Date().toISOString(),
+          }
+        : null
+    );
+  }
+
+  function handleContractUpload(file: File | null) {
+    if (!file || !c) return;
+    if (!/\.(docx?)$/i.test(file.name)) {
+      window.alert("Please upload a .doc or .docx file.");
+      return;
+    }
+    if (file.size > UPLOAD_WARN_BYTES) {
+      window.alert(
+        "This file is larger than 4 MB. Saving may fail in the browser storage quota; consider a smaller document."
+      );
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      setC((prev) =>
+        prev
+          ? {
+              ...prev,
+              contractUploadedFileName: file.name,
+              contractUploadedDataUrl: dataUrl,
+              updatedAt: new Date().toISOString(),
+            }
+          : null
+      );
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearContractUpload() {
+    setC((prev) =>
+      prev
+        ? {
+            ...prev,
+            contractUploadedFileName: undefined,
+            contractUploadedDataUrl: undefined,
+            updatedAt: new Date().toISOString(),
+          }
+        : null
+    );
+    if (contractFileInputRef.current) contractFileInputRef.current.value = "";
+  }
+
+  function patchFreightResponsibility(fr: string) {
+    setC((prev) =>
+      prev
+        ? {
+            ...prev,
+            freightResponsibility: fr,
+            shippingResponsibility: freightResponsibilityToShipping(fr),
+            updatedAt: new Date().toISOString(),
+          }
+        : null
+    );
+  }
+
+  function patchCarrierBilling(method: string) {
+    setC((prev) =>
+      prev
+        ? {
+            ...prev,
+            carrierBillingMethod: method,
+            customerShippingAccountNumber:
+              method === "Customer shipping account" ? prev.customerShippingAccountNumber : "",
+            updatedAt: new Date().toISOString(),
+          }
+        : null
+    );
+  }
+
   function handleFetch() {
     setFetchErr(null);
     const { opp, error } = resolveOpportunityForContractFetch(opportunities, {
@@ -214,6 +322,7 @@ export function ContractForm({ contractId }: { contractId?: string }) {
     lineItems = applyTierNotes(opp, lineItems, allocations);
     const customer = customerSnapshotFromOpportunity(opp);
     const qid = opp.quoteData.quoteId!;
+    const proposalFields = proposalSnapshotFromQuoteData(opp.quoteData);
     setPrimeOpp(opp);
     setPrimeAccount(getAccountByName(opp.accountName));
     setPrimeContact(getContactByAccountAndName(opp.accountName, opp.contactName));
@@ -227,6 +336,7 @@ export function ContractForm({ contractId }: { contractId?: string }) {
             contactName: opp.contactName,
             customer,
             lineItems,
+            ...proposalFields,
             updatedAt: new Date().toISOString(),
           }
         : null
@@ -301,17 +411,40 @@ export function ContractForm({ contractId }: { contractId?: string }) {
         </div>
         <div>
           <Label>Contract type</Label>
-          <select
-            className={selectCls}
-            value={c.type}
-            onChange={(e) => patch("type", e.target.value)}
-          >
-            {CONTRACT_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
+          <div className="flex gap-2 items-center">
+            <select
+              className={`${selectCls} flex-1 min-w-0`}
+              value={c.type}
+              onChange={(e) => handleContractTypeChange(e.target.value)}
+            >
+              {!findTemplateByLabel(c.type) && c.type.trim() !== "" && (
+                <option value={c.type}>{c.type}</option>
+              )}
+              {CONTRACT_TEMPLATE_OPTIONS.map((opt) => (
+                <option key={opt.fileName} value={opt.label}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              aria-label="Download Word template for selected type"
+              title="Download Word template for selected type"
+              onClick={() => {
+                if (
+                  !openContractTemplateDownload({
+                    type: c.type,
+                    contractTemplateFile: c.contractTemplateFile,
+                  })
+                ) {
+                  window.alert("Choose a catalog contract type above to download its template.");
+                }
+              }}
+              className="shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+            >
+              <Download size={16} className="text-slate-600 shrink-0" aria-hidden />
+            </button>
+          </div>
         </div>
         <div>
           <Label>Contract term</Label>
@@ -446,21 +579,188 @@ export function ContractForm({ contractId }: { contractId?: string }) {
         </div>
       </ContractCollapsible>
 
+      <ContractCollapsible title="Commercial details" defaultOpen>
+        <p className="text-xs text-slate-500 mb-3">
+          Aligns with the opportunity proposal modal. Payment terms map to contract payment due; fetch overwrites these
+          when quote data is pulled.
+        </p>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div>
+            <Label>Payment terms</Label>
+            <select
+              className={selectCls}
+              value={c.paymentDue}
+              onChange={(e) => patch("paymentDue", e.target.value)}
+            >
+              <option value="">—</option>
+              {!catalogIncludes(PAYMENT_TERMS_OPTIONS, c.paymentDue) && c.paymentDue.trim() !== "" ? (
+                <option value={c.paymentDue}>{c.paymentDue}</option>
+              ) : null}
+              {PAYMENT_TERMS_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <Label>Expected demand</Label>
+            <select
+              className={selectCls}
+              value={c.expectedDemand}
+              onChange={(e) => patch("expectedDemand", e.target.value)}
+            >
+              <option value="">—</option>
+              {!catalogIncludes(EXPECTED_DEMAND_OPTIONS, c.expectedDemand) &&
+              c.expectedDemand.trim() !== "" ? (
+                <option value={c.expectedDemand}>{c.expectedDemand}</option>
+              ) : null}
+              {EXPECTED_DEMAND_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </ContractCollapsible>
+
+      <ContractCollapsible title="Logistics & Fulfilment" defaultOpen>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div>
+            <Label>Delivery locations</Label>
+            <select
+              className={selectCls}
+              value={c.deliveryLocations}
+              onChange={(e) => patch("deliveryLocations", e.target.value)}
+            >
+              <option value="">—</option>
+              {!catalogIncludes(DELIVERY_LOCATIONS_OPTIONS, c.deliveryLocations) &&
+              c.deliveryLocations.trim() !== "" ? (
+                <option value={c.deliveryLocations}>{c.deliveryLocations}</option>
+              ) : null}
+              {DELIVERY_LOCATIONS_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+          </div>
+          {c.deliveryLocations === "Multi-site" ? (
+            <div>
+              <Label>Number of delivery locations</Label>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                className={inputCls}
+                value={c.deliveryLocationCount}
+                onChange={(e) => patch("deliveryLocationCount", e.target.value)}
+                placeholder="Quantity"
+              />
+            </div>
+          ) : (
+            <div className="hidden lg:block" aria-hidden />
+          )}
+          <div>
+            <Label>Delivery timeline for first order</Label>
+            <input
+              type="date"
+              className={inputCls}
+              value={c.firstOrderDeliveryDate}
+              onChange={(e) => patch("firstOrderDeliveryDate", e.target.value)}
+            />
+          </div>
+        </div>
+      </ContractCollapsible>
+
+      <ContractCollapsible title="Shipping details" defaultOpen>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div>
+            <Label>Freight responsibility</Label>
+            <select
+              className={selectCls}
+              value={resolvedFreightDisplay(c)}
+              onChange={(e) => patchFreightResponsibility(e.target.value)}
+            >
+              {!catalogIncludes(FREIGHT_RESPONSIBILITY_OPTIONS, resolvedFreightDisplay(c)) ? (
+                <option value={resolvedFreightDisplay(c)}>{resolvedFreightDisplay(c)}</option>
+              ) : null}
+              {FREIGHT_RESPONSIBILITY_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <Label>Delivery charges</Label>
+            <select
+              className={selectCls}
+              value={c.deliveryCharges}
+              onChange={(e) => patch("deliveryCharges", e.target.value)}
+            >
+              <option value="">—</option>
+              {!catalogIncludes(DELIVERY_CHARGES_OPTIONS, c.deliveryCharges) &&
+              c.deliveryCharges.trim() !== "" ? (
+                <option value={c.deliveryCharges}>{c.deliveryCharges}</option>
+              ) : null}
+              {DELIVERY_CHARGES_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <Label>Carrier billing</Label>
+            <select
+              className={selectCls}
+              value={c.carrierBillingMethod}
+              onChange={(e) => patchCarrierBilling(e.target.value)}
+            >
+              <option value="">—</option>
+              {!catalogIncludes(CARRIER_BILLING_OPTIONS, c.carrierBillingMethod) &&
+              c.carrierBillingMethod.trim() !== "" ? (
+                <option value={c.carrierBillingMethod}>{c.carrierBillingMethod}</option>
+              ) : null}
+              {CARRIER_BILLING_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+          </div>
+          {c.carrierBillingMethod === "Customer shipping account" ? (
+            <div>
+              <Label>Customer shipping account #</Label>
+              <input
+                className={inputCls}
+                value={c.customerShippingAccountNumber}
+                onChange={(e) => patch("customerShippingAccountNumber", e.target.value)}
+                placeholder="Account number"
+              />
+            </div>
+          ) : (
+            <div className="hidden lg:block" aria-hidden />
+          )}
+        </div>
+      </ContractCollapsible>
+
       <ContractCollapsible title="Payment terms">
+        <p className="text-xs text-slate-500 mb-3">
+          Payment terms (e.g. Net 30) are edited under Commercial details. Fetch replaces them from the quote proposal.
+        </p>
         <div className="grid sm:grid-cols-2 gap-3">
           <div>
             <Label>Payment method</Label>
             <input className={inputCls} value={c.paymentMethod} onChange={(e) => patch("paymentMethod", e.target.value)} />
           </div>
           <div>
-            <Label>Payment due</Label>
-            <input className={inputCls} value={c.paymentDue} onChange={(e) => patch("paymentDue", e.target.value)} />
-          </div>
-          <div>
             <Label>Advance payment</Label>
             <input className={inputCls} value={c.advancePayment} onChange={(e) => patch("advancePayment", e.target.value)} />
           </div>
-          <div>
+          <div className="sm:col-span-2">
             <Label>Late payment penalty</Label>
             <input className={inputCls} value={c.latePaymentPenalty} onChange={(e) => patch("latePaymentPenalty", e.target.value)} />
           </div>
@@ -468,6 +768,9 @@ export function ContractForm({ contractId }: { contractId?: string }) {
       </ContractCollapsible>
 
       <ContractCollapsible title="Delivery terms">
+        <p className="text-xs text-slate-500 mb-3">
+          Freight responsibility is under Shipping details (proposal). Fetch overwrites delivery timeline and method from the quote where applicable.
+        </p>
         <div className="grid sm:grid-cols-2 gap-3">
           <div>
             <Label>Delivery timeline</Label>
@@ -477,20 +780,7 @@ export function ContractForm({ contractId }: { contractId?: string }) {
             <Label>Delivery method</Label>
             <input className={inputCls} value={c.deliveryMethod} onChange={(e) => patch("deliveryMethod", e.target.value)} />
           </div>
-          <div>
-            <Label>Shipping responsibility</Label>
-            <select
-              className={selectCls}
-              value={c.shippingResponsibility}
-              onChange={(e) =>
-                patch("shippingResponsibility", e.target.value as Contract["shippingResponsibility"])
-              }
-            >
-              <option value="Seller">Seller</option>
-              <option value="Buyer">Buyer</option>
-            </select>
-          </div>
-          <div className="flex items-center gap-2 pt-6">
+          <div className="flex items-center gap-2 pt-6 sm:col-span-2">
             <input
               type="checkbox"
               id="partial"
@@ -553,6 +843,36 @@ export function ContractForm({ contractId }: { contractId?: string }) {
             <Label>Contract-specific agreements</Label>
             <textarea className={inputCls + " min-h-[64px]"} value={c.contractSpecificAgreements} onChange={(e) => patch("contractSpecificAgreements", e.target.value)} />
           </div>
+        </div>
+      </ContractCollapsible>
+
+      <ContractCollapsible title="Upload contract">
+        <p className="text-xs text-slate-500 mb-3">
+          Optional. When uploaded, this file is used for Download contract (view screen and list). Otherwise the selected
+          contract type template from the library is opened.
+        </p>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <input
+            ref={contractFileInputRef}
+            type="file"
+            accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            className="block w-full text-[13px] text-slate-700 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#002f93] file:text-white hover:file:bg-[#002a7d]"
+            onChange={(e) => handleContractUpload(e.target.files?.[0] ?? null)}
+          />
+          {c.contractUploadedFileName && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-slate-600 truncate max-w-[240px]" title={c.contractUploadedFileName}>
+                {c.contractUploadedFileName}
+              </span>
+              <button
+                type="button"
+                onClick={clearContractUpload}
+                className="text-xs font-semibold text-red-600 hover:underline"
+              >
+                Remove
+              </button>
+            </div>
+          )}
         </div>
       </ContractCollapsible>
 

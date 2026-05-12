@@ -227,7 +227,7 @@ export function PrimeQuoteBlock({ quoteData, opportunity }: { quoteData: QuoteDa
       </div>
 
       <div className="grid sm:grid-cols-2 gap-3 text-sm">
-        <Field label="Opportunity" value={opportunity.opportunityName} />
+        <Field label="Opportunity" value={opportunity.accountName} />
         <Field label="Quote stage" value={quoteData.quoteStage} />
         <Field label="Valid through" value={formatValidDate(quoteData.validDate)} />
         <Field label="Urgency" value={quoteData.urgency} />

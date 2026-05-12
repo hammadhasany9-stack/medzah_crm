@@ -4,62 +4,72 @@ import { useState } from "react";
 import { useTenantRouter } from "@/components/providers/TenantProvider";
 import { ArrowLeft, Mail } from "lucide-react";
 import {
-  CustomerIntakeFormFields,
-  CustomerIntakeFormData,
-  EMPTY_INTAKE_FORM,
-} from "@/components/customer-intake/CustomerIntakeFormFields";
+  CustomerIntakeQuickForm,
+  EMPTY_QUICK_INTAKE,
+  CustomerIntakeQuickFormValue,
+  quickFormToPrimaryNames,
+} from "@/components/customer-intake/CustomerIntakeQuickForm";
+import { EMPTY_INTAKE_FORM } from "@/components/customer-intake/intake-form-shared";
 import {
   loadCustomerIntakes,
   saveCustomerIntakes,
   generateIntakeId,
 } from "@/lib/mock-data/customer-intake";
 
+function validateQuickForm(v: CustomerIntakeQuickFormValue): Partial<Record<keyof CustomerIntakeQuickFormValue, string>> {
+  const errs: Partial<Record<keyof CustomerIntakeQuickFormValue, string>> = {};
+  if (!v.contactId.trim()) errs.contactName = "Select a contact";
+  if (!v.accountName.trim()) errs.accountName = "Select an account";
+  if (!v.email.trim()) {
+    errs.email = "Email is required";
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email)) {
+    errs.email = "Enter a valid email address";
+  }
+  return errs;
+}
+
 export default function CreateCustomerIntakePage() {
   const router = useTenantRouter();
-  const [formData, setFormData] = useState<CustomerIntakeFormData>(EMPTY_INTAKE_FORM);
-  const [errors, setErrors] = useState<Partial<Record<keyof CustomerIntakeFormData, string>>>({});
+  const [formData, setFormData] = useState<CustomerIntakeQuickFormValue>(EMPTY_QUICK_INTAKE);
+  const [errors, setErrors] = useState<Partial<Record<keyof CustomerIntakeQuickFormValue, string>>>({});
   const [saving, setSaving] = useState(false);
 
   function validate(): boolean {
-    const errs: Partial<Record<keyof CustomerIntakeFormData, string>> = {};
-    if (!formData.customerName.trim()) errs.customerName = "Customer name is required";
-    if (!formData.email.trim()) {
-      errs.email = "Email is required";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      errs.email = "Enter a valid email address";
-    }
+    const errs = validateQuickForm(formData);
     setErrors(errs);
     return Object.keys(errs).length === 0;
   }
 
   function persistRecord() {
+    const { first, last } = quickFormToPrimaryNames(formData);
+    const extended = EMPTY_INTAKE_FORM;
     const all = loadCustomerIntakes();
     all.unshift({
       id: generateIntakeId(),
-      customerFor: formData.customerFor,
-      customerName: formData.customerName,
-      email: formData.email,
+      customerFor: extended.customerFor,
+      customerName: formData.accountName.trim(),
+      email: formData.email.trim(),
       intakeOwner: formData.intakeOwner,
       modifiedTime: new Date().toISOString(),
       status: "Onboarding Pending" as const,
-      primaryContactFirstName: formData.primaryContactFirstName,
-      primaryContactLastName: formData.primaryContactLastName,
-      primaryContactPhone: formData.primaryContactPhone,
-      primaryContactMobile: formData.primaryContactMobile,
-      website: formData.website,
-      accountsPayableFirstName: formData.accountsPayableFirstName,
-      accountsPayableLastName: formData.accountsPayableLastName,
-      accountsPayableEmail: formData.accountsPayableEmail,
-      accountsPayablePhone: formData.accountsPayablePhone,
-      primaryAddressStreet: formData.primaryAddressStreet,
-      primaryAddressCity: formData.primaryAddressCity,
-      primaryAddressState: formData.primaryAddressState,
-      primaryAddressZipCode: formData.primaryAddressZipCode,
-      orderMethodPreference: formData.orderMethodPreference,
-      w9OrTaxExempt: formData.w9OrTaxExempt,
-      jobTitle: formData.jobTitle,
-      secondaryEmail: formData.secondaryEmail,
-      salesRep: formData.salesRep,
+      primaryContactFirstName: first,
+      primaryContactLastName: last,
+      primaryContactPhone: extended.primaryContactPhone,
+      primaryContactMobile: extended.primaryContactMobile,
+      website: extended.website,
+      accountsPayableFirstName: extended.accountsPayableFirstName,
+      accountsPayableLastName: extended.accountsPayableLastName,
+      accountsPayableEmail: extended.accountsPayableEmail,
+      accountsPayablePhone: extended.accountsPayablePhone,
+      primaryAddressStreet: extended.primaryAddressStreet,
+      primaryAddressCity: extended.primaryAddressCity,
+      primaryAddressState: extended.primaryAddressState,
+      primaryAddressZipCode: extended.primaryAddressZipCode,
+      orderMethodPreference: extended.orderMethodPreference,
+      w9OrTaxExempt: extended.w9OrTaxExempt,
+      jobTitle: extended.jobTitle,
+      secondaryEmail: extended.secondaryEmail,
+      salesRep: extended.salesRep,
     });
     saveCustomerIntakes(all);
   }
@@ -75,8 +85,7 @@ export default function CreateCustomerIntakePage() {
     if (!validate()) return;
     setSaving(true);
     persistRecord();
-    // Reset form for a fresh entry
-    setFormData(EMPTY_INTAKE_FORM);
+    setFormData(EMPTY_QUICK_INTAKE);
     setErrors({});
     setSaving(false);
   }
@@ -85,7 +94,7 @@ export default function CreateCustomerIntakePage() {
     if (!validate()) return;
     persistRecord();
     if (formData.email) {
-      window.location.href = `mailto:${formData.email}?subject=Customer Intake - ${formData.customerName}`;
+      window.location.href = `mailto:${formData.email}?subject=Customer Intake - ${formData.accountName.trim()}`;
     }
   }
 
@@ -95,7 +104,6 @@ export default function CreateCustomerIntakePage() {
 
   return (
     <div className="flex flex-col min-h-full">
-      {/* Sub-header */}
       <div className="bg-white border-b border-slate-100 shadow-sm px-6 py-3 flex items-center justify-between sticky top-0 z-10">
         <button
           onClick={handleCancel}
@@ -137,13 +145,8 @@ export default function CreateCustomerIntakePage() {
         </div>
       </div>
 
-      {/* Form body */}
       <div className="flex-1 p-6">
-        <CustomerIntakeFormFields
-          value={formData}
-          onChange={setFormData}
-          errors={errors}
-        />
+        <CustomerIntakeQuickForm value={formData} onChange={setFormData} errors={errors} />
       </div>
     </div>
   );

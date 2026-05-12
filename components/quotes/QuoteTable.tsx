@@ -1,16 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Eye,
-  PackageSearch,
-} from "lucide-react";
+import { Eye } from "lucide-react";
 import { Opportunity } from "@/lib/types";
-import { useCRMShell } from "@/components/shell/CRMShellContext";
-import { canDownloadAllocationExport } from "@/lib/export-allocation-xlsx";
-import { DownloadAllocationButton } from "@/components/allocations/DownloadAllocationButton";
 import { ViewQuoteModal } from "./ViewQuoteModal";
-import { ViewAllocationModal } from "@/components/leads/ViewAllocationModal";
 import {
   getQuoteTableStatusLabel,
   formatQuoteValidDateCell,
@@ -35,9 +28,6 @@ export function QuoteTable({ opportunities, selectedId, onRowClick }: QuoteTable
             </th>
             <th className="px-3 py-2.5 font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">
               Urgency
-            </th>
-            <th className="px-3 py-2.5 font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">
-              Alloc.
             </th>
             <th className="px-3 py-2.5 font-semibold uppercase tracking-wide text-slate-500 min-w-[140px]">
               Opportunity
@@ -89,7 +79,7 @@ export function QuoteTable({ opportunities, selectedId, onRowClick }: QuoteTable
         <tbody>
           {opportunities.length === 0 ? (
             <tr>
-              <td colSpan={18} className="px-4 py-12 text-center text-sm text-slate-400">
+              <td colSpan={17} className="px-4 py-12 text-center text-sm text-slate-400">
                 No quotes match the current filters.
               </td>
             </tr>
@@ -118,17 +108,10 @@ function QuoteTableRow({
   isSelected: boolean;
   onRowClick: (opp: Opportunity) => void;
 }) {
-  const { allocations } = useCRMShell();
   const [showQuoteModal, setShowQuoteModal] = useState(false);
-  const [showAllocModal, setShowAllocModal] = useState(false);
 
   const quoteData = opp.quoteData;
   if (!quoteData) return null;
-
-  const allocationRecord = opp.allocationId
-    ? allocations.find((a) => a.id === opp.allocationId) ?? null
-    : null;
-  const hasAllocation = !!(opp.procurementAllocation || allocationRecord);
 
   const statusLabel = getQuoteTableStatusLabel(opp);
 
@@ -146,15 +129,8 @@ function QuoteTableRow({
         <td className="px-3 py-2.5 align-middle whitespace-nowrap font-medium">
           {quoteData.urgency}
         </td>
-        <td className="px-3 py-2.5 align-middle whitespace-nowrap">
-          {hasAllocation ? (
-            <span className="text-emerald-700 font-semibold">Yes</span>
-          ) : (
-            <span className="text-slate-400">—</span>
-          )}
-        </td>
         <td className="px-3 py-2.5 align-middle max-w-[200px]">
-          <span className="font-semibold text-slate-900 line-clamp-2">{opp.opportunityName}</span>
+          <span className="font-semibold text-slate-900 line-clamp-2">{opp.accountName}</span>
         </td>
         <td className="px-3 py-2.5 align-middle font-mono text-[11px] text-[#002f93] whitespace-nowrap">
           {quoteData.quoteId ?? "—"}
@@ -221,41 +197,12 @@ function QuoteTableRow({
               <Eye size={11} />
               View Quote
             </button>
-            {allocationRecord && canDownloadAllocationExport(allocationRecord.status) && (
-              <DownloadAllocationButton
-                record={allocationRecord}
-                stopPropagation
-                size="sm"
-                className="w-full justify-center py-1 text-[11px]"
-              />
-            )}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (allocationRecord) setShowAllocModal(true);
-              }}
-              disabled={!allocationRecord}
-              title={
-                allocationRecord ? "Open allocation details" : "No linked allocation record"
-              }
-              className="flex items-center justify-center gap-1 px-2 py-1.5 text-[11px] font-semibold rounded-md border border-[#002f93]/25 text-[#002f93] hover:bg-[#002f93]/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <PackageSearch size={11} />
-              View Allocation
-            </button>
           </div>
         </td>
       </tr>
 
       {showQuoteModal && (
         <ViewQuoteModal opportunity={opp} onClose={() => setShowQuoteModal(false)} />
-      )}
-      {showAllocModal && allocationRecord && (
-        <ViewAllocationModal
-          allocation={allocationRecord}
-          onClose={() => setShowAllocModal(false)}
-        />
       )}
     </>
   );

@@ -13,7 +13,7 @@ const LEAD_SOURCES   = ["None", "Cold Call", "Internal Referral", "External Refe
 const LEAD_OWNERS    = ["Katie Allen", "Kevin Calamari", "Unassigned"];
 const CUSTOMER_FOR   = ["None", "Medzah", "Nexkara"];
 const PRIORITIES: Priority[]  = ["Hot", "Warm", "Cold"];
-const STATUSES: LeadStatus[]  = ["New", "Attempted Contact", "Contacted", "Allocation", "Qualified", "Allocation on hold", "Inactive"];
+const STATUSES: LeadStatus[]  = ["New", "Attempted Contact", "Contacted", "Qualified", "Inactive"];
 const INDUSTRIES     = ["None", "Healthcare", "Retail", "Hospitality", "Education", "Real Estate", "Technology", "Finance", "Construction", "Other"];
 
 // ─── Field components ─────────────────────────────────────────────────────────
@@ -275,7 +275,9 @@ export default function EditLeadPage() {
               <div className="relative">
                 <select value={form.leadStatus} onChange={(e) => set("leadStatus", e.target.value)} className={selectCls}>
                   <option value="">None</option>
-                  {STATUSES.map((s) => <option key={s}>{s}</option>)}
+                  {(STATUSES.includes(form.leadStatus as LeadStatus) ? STATUSES : [...STATUSES, form.leadStatus as LeadStatus]).map((s) => (
+                    <option key={s}>{s}</option>
+                  ))}
                 </select>
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">▾</span>
               </div>

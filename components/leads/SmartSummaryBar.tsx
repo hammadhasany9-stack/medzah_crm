@@ -7,9 +7,7 @@ const TILES: { label: string; status: LeadStatus; color: string }[] = [
   { label: "New",                 status: "New",                 color: "#6366F1" },
   { label: "Attempted Contact",   status: "Attempted Contact",   color: "#F59E0B" },
   { label: "Contacted",           status: "Contacted",           color: "#10B981" },
-  { label: "Allocation",          status: "Allocation",          color: "#002f93" },
   { label: "Qualified",           status: "Qualified",           color: "#8B5CF6" },
-  { label: "On Hold",             status: "Allocation on hold",  color: "#64748B" },
   { label: "Inactive",            status: "Inactive",            color: "#EF4444" },
 ];
 

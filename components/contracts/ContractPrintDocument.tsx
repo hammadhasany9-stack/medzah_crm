@@ -2,6 +2,7 @@
 
 import type { Contract } from "@/lib/types";
 import { contractStatusLabel, formatEffectiveFrom } from "@/components/contracts/contract-format";
+import { formatQuoteIsoDate } from "@/components/quotes/QuoteExtendedSummary";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -95,10 +96,48 @@ export function ContractPrintDocument({
         </div>
       </Section>
 
+      <Section title="Commercial details">
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Cell label="Payment terms" value={c.paymentDue} />
+          <Cell label="Expected demand" value={c.expectedDemand} />
+        </div>
+      </Section>
+
+      <Section title="Logistics & Fulfilment">
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Cell label="Delivery locations" value={c.deliveryLocations} />
+          {c.deliveryLocations === "Multi-site" ? (
+            <Cell label="Number of delivery locations" value={c.deliveryLocationCount} />
+          ) : (
+            <Cell label="Number of delivery locations" value="—" />
+          )}
+          <Cell label="First order delivery" value={formatQuoteIsoDate(c.firstOrderDeliveryDate)} />
+        </div>
+      </Section>
+
+      <Section title="Shipping details">
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Cell
+            label="Freight responsibility"
+            value={
+              c.freightResponsibility.trim() !== ""
+                ? c.freightResponsibility
+                : c.shippingResponsibility === "Buyer"
+                  ? "Customer pays freight"
+                  : "We cover freight"
+            }
+          />
+          <Cell label="Delivery charges" value={c.deliveryCharges} />
+          <Cell label="Carrier billing" value={c.carrierBillingMethod} />
+          {c.carrierBillingMethod === "Customer shipping account" ? (
+            <Cell label="Customer shipping account #" value={c.customerShippingAccountNumber} />
+          ) : null}
+        </div>
+      </Section>
+
       <Section title="Payment terms">
         <div className="grid sm:grid-cols-2 gap-4">
           <Cell label="Payment method" value={c.paymentMethod} />
-          <Cell label="Payment due" value={c.paymentDue} />
           <Cell label="Advance payment" value={c.advancePayment} />
           <Cell label="Late payment penalty" value={c.latePaymentPenalty} />
         </div>
@@ -108,7 +147,6 @@ export function ContractPrintDocument({
         <div className="grid sm:grid-cols-2 gap-4">
           <Cell label="Delivery timeline" value={c.deliveryTimeline} />
           <Cell label="Delivery method" value={c.deliveryMethod} />
-          <Cell label="Shipping responsibility" value={c.shippingResponsibility} />
           <Cell label="Partial delivery" value={c.partialDeliveryAllowed ? "Yes" : "No"} />
         </div>
       </Section>

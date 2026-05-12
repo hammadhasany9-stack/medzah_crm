@@ -15,6 +15,7 @@ import { useCRMShell } from "@/components/shell/CRMShellContext";
 import { contractStatusLabel } from "@/components/contracts/contract-format";
 import { ContractPrintDocument } from "@/components/contracts/ContractPrintDocument";
 import { cn } from "@/lib/utils";
+import { downloadContractBinary } from "@/lib/contract-templates";
 
 export default function ContractViewPage() {
   const params = useParams();
@@ -92,7 +93,9 @@ export default function ContractViewPage() {
               <>
                 <button
                   type="button"
-                  onClick={() => window.print()}
+                  onClick={() => {
+                    if (!downloadContractBinary(c)) window.print();
+                  }}
                   className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50"
                 >
                   <Download size={14} /> Download contract

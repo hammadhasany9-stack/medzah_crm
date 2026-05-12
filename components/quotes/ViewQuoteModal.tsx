@@ -2,14 +2,13 @@
 
 import { useState } from "react";
 import {
-  X, DownloadCloud, Send, Building2, MapPin, User, Phone, Mail,
-  CheckCircle2, Clock, XCircle, Printer,
+  X, DownloadCloud, Send,
+  CheckCircle2, Clock, XCircle,
 } from "lucide-react";
 import { Opportunity, QuoteData } from "@/lib/types";
-import {
-  QuoteCommercialLogisticsShippingReadOnly,
-  QuotePricingCostBreakdown,
-} from "@/components/quotes/QuoteExtendedSummary";
+import { getAccountById, getAccountByName } from "@/lib/mock-data/accounts";
+import type { AccountRecord } from "@/lib/mock-data/accounts";
+import { QuoteCommercialLogisticsShippingReadOnly } from "@/components/quotes/QuoteExtendedSummary";
 import * as XLSX from "xlsx";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -25,6 +24,16 @@ function fmt(value: number): string {
     currency: "USD",
     minimumFractionDigits: 2,
   }).format(value);
+}
+
+/** Template-style price with space after $ */
+function fmtTemplate(value: number): string {
+  return fmt(value).replace("$", "$ ");
+}
+
+function formatItemUnitPrice(raw: string | undefined): string {
+  if (!raw?.trim()) return "—";
+  return fmtTemplate(parseMoney(raw));
 }
 
 function formatDate(iso: string | undefined): string {
@@ -44,7 +53,6 @@ function downloadQuoteXLSX(opp: Opportunity, data?: QuoteData) {
     ["Quote Ref", q.quoteId ?? opp.opportunityRef],
     ["Quote Subject", q.subject],
     ["Account Name", q.accountName],
-    ["Opportunity Name", q.opportunityName],
     ["Quote Stage", q.quoteStage],
     ["Valid Date", q.validDate],
     ["Contact Name", q.contactName],
@@ -77,7 +85,7 @@ function downloadQuoteXLSX(opp: Opportunity, data?: QuoteData) {
   const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
   summaryWs["!cols"] = [{ wch: 28 }, { wch: 32 }];
 
-  const itemsHeader = ["#", "Product Name (SKU)", "Description", "Quantity", "Unit Price", "Amount"];
+  const itemsHeader = ["Item No.", "Product Details", "Description", "Quantity", "Price", "Total"];
   const itemsData = [
     itemsHeader,
     ...q.items.map((item, i) => [
@@ -85,17 +93,17 @@ function downloadQuoteXLSX(opp: Opportunity, data?: QuoteData) {
       item.listPrice, `$${item.amount}`,
     ]),
     [],
-    ["", "", "", "", "Subtotal", `$${q.subtotal}`],
+    ["", "", "", "", "Sub Total", `$${q.subtotal}`],
     ["", "", "", "", "Discount", q.discount || "$0"],
     ["", "", "", "", "Tax", q.tax || "$0"],
     ["", "", "", "", "Adjustment", q.adjustment || "$0"],
-    ["", "", "", "", "Grand Total (product)", `$${q.grandTotal}`],
+    ["", "", "", "", "Total", `$${q.grandTotal}`],
     ["", "", "", "", "Overhead", `$${q.overheadAmount ?? "0"}`],
     ["", "", "", "", "Sales commission", `$${q.salesCommissionAmount ?? "0"}`],
     ["", "", "", "", "Final Quote Total", `$${q.finalQuoteTotal ?? q.grandTotal}`],
   ];
   const itemsWs = XLSX.utils.aoa_to_sheet(itemsData);
-  itemsWs["!cols"] = [{ wch: 4 }, { wch: 30 }, { wch: 28 }, { wch: 10 }, { wch: 14 }, { wch: 14 }];
+  itemsWs["!cols"] = [{ wch: 6 }, { wch: 28 }, { wch: 28 }, { wch: 10 }, { wch: 14 }, { wch: 14 }];
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, summaryWs, "Quote Summary");
@@ -103,6 +111,114 @@ function downloadQuoteXLSX(opp: Opportunity, data?: QuoteData) {
 
   const fileName = `Quote_${(q.subject || opp.opportunityRef).replace(/\s+/g, "_")}.xlsx`;
   XLSX.writeFile(wb, fileName);
+}
+
+function isBlank(s: string | undefined): boolean {
+  return !s?.trim();
+}
+
+/** True when all shipping address parts are empty — Ship To should mirror billing. */
+function isShippingAddressEmpty(q: QuoteData): boolean {
+  return (
+    isBlank(q.shippingStreet) &&
+    isBlank(q.shippingCity) &&
+    isBlank(q.shippingState) &&
+    isBlank(q.shippingCode) &&
+    isBlank(q.shippingCountry)
+  );
+}
+
+/** True when all shipping address parts are empty on an account — mirror billing. */
+function isAccountShippingEmpty(acc: AccountRecord): boolean {
+  return (
+    isBlank(acc.shippingStreet) &&
+    isBlank(acc.shippingCity) &&
+    isBlank(acc.shippingState) &&
+    isBlank(acc.shippingCode) &&
+    isBlank(acc.shippingCountry)
+  );
+}
+
+/** One line per field; country uppercased like the reference PDF. */
+function addressLinesFromParts(
+  street: string,
+  city: string,
+  state: string,
+  code: string,
+  country: string
+): string[] {
+  const lines: string[] = [];
+  if (street.trim()) lines.push(street.trim());
+  if (city.trim()) lines.push(city.trim());
+  if (state.trim()) lines.push(state.trim());
+  if (country.trim()) lines.push(country.trim().toUpperCase());
+  if (code.trim()) lines.push(code.trim());
+  return lines;
+}
+
+function billingAddressLines(q: QuoteData): string[] {
+  return addressLinesFromParts(
+    q.billingStreet,
+    q.billingCity,
+    q.billingState,
+    q.billingCode,
+    q.billingCountry
+  );
+}
+
+function effectiveShippingAddressLines(q: QuoteData): string[] {
+  if (isShippingAddressEmpty(q)) {
+    return billingAddressLines(q);
+  }
+  return addressLinesFromParts(
+    q.shippingStreet,
+    q.shippingCity,
+    q.shippingState,
+    q.shippingCode,
+    q.shippingCountry
+  );
+}
+
+function billingAddressLinesFromAccount(acc: AccountRecord): string[] {
+  return addressLinesFromParts(
+    acc.billingStreet,
+    acc.billingCity,
+    acc.billingState,
+    acc.billingCode,
+    acc.billingCountry
+  );
+}
+
+function effectiveShippingAddressLinesFromAccount(acc: AccountRecord): string[] {
+  if (isAccountShippingEmpty(acc)) {
+    return billingAddressLinesFromAccount(acc);
+  }
+  return addressLinesFromParts(
+    acc.shippingStreet,
+    acc.shippingCity,
+    acc.shippingState,
+    acc.shippingCode,
+    acc.shippingCountry
+  );
+}
+
+/** CRM account tied to this quote (id first, then name match). */
+function resolveAccountForQuote(opp: Opportunity, q: QuoteData): AccountRecord | null {
+  const id = opp.linkedAccountId?.trim();
+  if (id) {
+    const byId = getAccountById(id);
+    if (byId) return byId;
+  }
+  const names = [q.accountName, opp.accountName, opp.companyName];
+  const seen = new Set<string>();
+  for (const raw of names) {
+    const name = raw?.trim();
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    const acc = getAccountByName(name);
+    if (acc) return acc;
+  }
+  return null;
 }
 
 // ─── Status chip ──────────────────────────────────────────────────────────────
@@ -126,18 +242,27 @@ function StatusChip({ status }: { status: string | undefined }) {
   return null;
 }
 
-// ─── Address block ────────────────────────────────────────────────────────────
-
-function AddressBlock({
-  title,
+function BorderedQuoteAddressBox({
+  heading,
   lines,
-}: { title: string; lines: string[] }) {
+}: {
+  heading: string;
+  lines: string[];
+}) {
   return (
-    <div className="space-y-1">
-      <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">{title}</p>
-      {lines.filter(Boolean).map((line, i) => (
-        <p key={i} className="text-[13px] text-slate-700 leading-snug">{line}</p>
-      ))}
+    <div className="border border-slate-300 bg-slate-50/40 p-4 min-h-[120px] flex flex-col">
+      <p className="text-[12px] font-bold text-slate-900 mb-2">{heading}</p>
+      <div className="space-y-0.5 flex-1">
+        {lines.length === 0 ? (
+          <p className="text-[13px] text-slate-400">—</p>
+        ) : (
+          lines.map((line, i) => (
+            <p key={i} className="text-[13px] text-slate-800 leading-snug">
+              {line}
+            </p>
+          ))
+        )}
+      </div>
     </div>
   );
 }
@@ -175,10 +300,36 @@ export function ViewQuoteModal({ opportunity, onClose }: ViewQuoteModalProps) {
   const tax       = parseMoney(q.tax);
   const adjustment = parseMoney(q.adjustment);
   const grandTotal = parseMoney(q.grandTotal);
-  const displayHeroTotal = parseMoney(q.finalQuoteTotal?.trim() ? q.finalQuoteTotal : q.grandTotal);
 
-  const quoteRef = q.quoteId ?? opportunity.opportunityRef;
-  const issueDate = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  const quoteNumber = q.quoteId ?? opportunity.opportunityRef;
+  const resolvedAccount = resolveAccountForQuote(opportunity, q);
+
+  const billLines = resolvedAccount
+    ? (() => {
+        const fromAcc = billingAddressLinesFromAccount(resolvedAccount);
+        return fromAcc.length > 0 ? fromAcc : billingAddressLines(q);
+      })()
+    : billingAddressLines(q);
+  const shipLines = resolvedAccount
+    ? (() => {
+        const fromAcc = effectiveShippingAddressLinesFromAccount(resolvedAccount);
+        return fromAcc.length > 0 ? fromAcc : effectiveShippingAddressLines(q);
+      })()
+    : effectiveShippingAddressLines(q);
+
+  const accountDisplay = (() => {
+    if (resolvedAccount) {
+      const suffix =
+        opportunity.linkedAccountId?.trim() ||
+        resolvedAccount.accountNumber?.trim() ||
+        resolvedAccount.id;
+      return suffix ? `${resolvedAccount.name} (${suffix})` : resolvedAccount.name;
+    }
+    if (opportunity.linkedAccountId?.trim()) {
+      return `${q.accountName} (${opportunity.linkedAccountId})`;
+    }
+    return q.accountName;
+  })();
 
   return (
     <>
@@ -254,241 +405,204 @@ export function ViewQuoteModal({ opportunity, onClose }: ViewQuoteModalProps) {
           )}
 
           {/* ── Quote Document ── */}
-          <div className="overflow-y-auto max-h-[calc(100vh-130px)]">
+          <div className="overflow-y-auto max-h-[calc(100vh-130px)] text-slate-900">
 
-            {/* Quote header */}
-            <div className="px-8 pt-8 pb-6 border-b border-slate-100">
-              <div className="flex items-start justify-between gap-6">
-                {/* Company brand */}
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-[#002f93] flex items-center justify-center">
-                      <Building2 size={20} className="text-white" />
-                    </div>
-                    <div>
-                      <p className="text-[18px] font-black text-[#002f93] tracking-tight leading-none">MEDZAH</p>
-                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Nexkara CRM</p>
-                    </div>
+            {/* Header — template layout */}
+            <div className="px-8 pt-8 pb-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3 flex-shrink-0 min-w-0">
+                  <div className="w-12 h-12 rounded-lg border-2 border-slate-800 flex flex-col items-center justify-center bg-white flex-shrink-0">
+                    <span className="text-[11px] font-black leading-none tracking-tight">MD</span>
+                    <span className="text-[8px] font-bold tracking-wide text-slate-600 mt-0.5">MEDZAH</span>
                   </div>
-                  <div className="text-[12px] text-slate-500 space-y-0.5 mt-3">
-                    <p className="flex items-center gap-1.5"><MapPin size={11} className="flex-shrink-0" /> 123 Commerce Ave, Suite 400</p>
-                    <p className="pl-4">Houston, TX 77002, USA</p>
-                    <p className="flex items-center gap-1.5"><Phone size={11} className="flex-shrink-0" /> +1 (713) 555-0100</p>
-                    <p className="flex items-center gap-1.5"><Mail size={11} className="flex-shrink-0" /> sales@medzah.com</p>
-                  </div>
+                  <p className="text-[22px] font-semibold text-slate-900 tracking-tight leading-tight">Medzah</p>
                 </div>
-
-                {/* Quote meta */}
-                <div className="text-right space-y-2 min-w-[220px]">
-                  <div>
-                    <p className="text-[36px] font-black text-slate-900 leading-none tracking-tight">QUOTE</p>
-                    <p className="text-[13px] font-semibold text-slate-500 mt-1">#{quoteRef}</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-right mt-3">
-                    <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide col-start-1">Issue Date:</p>
-                    <p className="text-[12px] text-slate-700">{issueDate}</p>
-                    <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Valid Until:</p>
-                    <p className="text-[12px] text-slate-700">{formatDate(q.validDate)}</p>
-                    <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Stage:</p>
-                    <p className="text-[12px] text-slate-700">{q.quoteStage || "—"}</p>
-                  </div>
-                  {/* Grand total highlight */}
-                  <div className="mt-3 bg-[#002f93] rounded-xl px-4 py-2.5 text-right">
-                    <p className="text-[10px] font-semibold text-white/70 uppercase tracking-widest">
-                      {q.finalQuoteTotal?.trim() ? "Final Quote Total" : "Grand Total"}
-                    </p>
-                    <p className="text-[22px] font-black text-white leading-tight">{fmt(displayHeroTotal)}</p>
-                  </div>
+                <div className="text-right flex-shrink-0 min-w-[200px]">
+                  <p className="text-[32px] font-bold text-slate-900 leading-none tracking-tight">Quote</p>
+                  <p className="text-[12px] text-slate-700 mt-3">
+                    <span className="font-bold">Valid Until</span>
+                    <span className="block mt-0.5">{formatDate(q.validDate)}</span>
+                  </p>
+                  <p className="text-[12px] mt-2">
+                    <span className="font-bold">Quote Number :</span>{" "}
+                    <span className="tabular-nums">{quoteNumber}</span>
+                  </p>
                 </div>
               </div>
-
-              {/* Subject */}
-              {q.subject && (
-                <div className="mt-4 px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Subject</p>
-                  <p className="text-[14px] font-semibold text-slate-800 mt-0.5">{q.subject}</p>
-                </div>
-              )}
             </div>
 
             {/* Bill To / Ship To */}
-            <div className="px-8 py-5 grid grid-cols-2 gap-6 border-b border-slate-100">
-              <div className="space-y-3">
-                <AddressBlock
-                  title="Bill To"
-                  lines={[
-                    q.accountName,
-                    q.billingStreet,
-                    [q.billingCity, q.billingState, q.billingCode].filter(Boolean).join(", "),
-                    q.billingCountry,
-                  ]}
-                />
-                <div className="flex items-center gap-1.5 text-[12px] text-slate-600">
-                  <User size={12} className="text-slate-400 flex-shrink-0" />
-                  <span className="font-semibold">{q.contactName}</span>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <AddressBlock
-                  title="Ship To"
-                  lines={[
-                    q.accountName,
-                    q.shippingStreet,
-                    [q.shippingCity, q.shippingState, q.shippingCode].filter(Boolean).join(", "),
-                    q.shippingCountry,
-                  ]}
-                />
-                <div className="text-[12px] text-slate-600 space-y-0.5">
-                  <p><span className="text-slate-400">Shipping Method:</span> {q.shippingMethod || "—"}</p>
-                  <p><span className="text-slate-400">Customer PO:</span> {q.customerPO || "—"}</p>
-                  <p><span className="text-slate-400">Order Submittal:</span> {q.orderSubmittalMethod || "—"}</p>
-                </div>
+            <div className="px-8 pb-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <BorderedQuoteAddressBox heading="BILL TO:" lines={billLines} />
+              <BorderedQuoteAddressBox heading="SHIP TO:" lines={shipLines} />
+            </div>
+
+            {/* Account metadata bar */}
+            <div className="px-8 py-3 bg-slate-200/70 border-y border-slate-300">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[12px]">
+                <p>
+                  <span className="font-bold">Account Name: </span>
+                  <span>{accountDisplay}</span>
+                </p>
+                
+                <p>
+                  <span className="font-bold">Contact Name: </span>
+                  <span>{q.contactName || "—"}</span>
+                </p>
+                <p>
+                  <span className="font-bold">Quote Stage: </span>
+                  <span>{q.quoteStage || "—"}</span>
+                </p>
               </div>
             </div>
 
-            {/* Prepared by */}
-            <div className="px-8 py-3 border-b border-slate-100 bg-slate-50/60">
-              <div className="flex items-center justify-between text-[12px] text-slate-600">
-                <span><span className="text-slate-400">Prepared by:</span> <span className="font-semibold">{q.opportunityOwner}</span></span>
-                <span><span className="text-slate-400">Business Type:</span> {q.businessType}</span>
-                <span><span className="text-slate-400">Opportunity:</span> {q.opportunityName}</span>
-              </div>
+            {/* Commercial, logistics & shipping (above line items) */}
+            <div className="px-8 pb-4 pt-4 border-b border-slate-200">
+              <QuoteCommercialLogisticsShippingReadOnly q={q} variant="structured" />
             </div>
 
-            {/* Commercial, logistics & shipping (proposal / create quote) */}
-            <div className="px-8 py-5 border-b border-slate-100 bg-white">
-              <QuoteCommercialLogisticsShippingReadOnly q={q} />
-            </div>
-
-            {/* Line items table */}
+            {/* Line items */}
             <div className="px-8 py-5">
-              <div className="border border-slate-200 rounded-xl overflow-hidden">
-                {/* Table header */}
-                <div className="grid grid-cols-[32px_1fr_80px_110px_110px] bg-[#002f93] text-white">
-                  <div className="px-2 py-3 text-[11px] font-bold text-center text-white/70">#</div>
-                  <div className="px-4 py-3 text-[11px] font-bold text-white/90">PRODUCT / SKU</div>
-                  <div className="px-3 py-3 text-[11px] font-bold text-center text-white/90">QTY</div>
-                  <div className="px-3 py-3 text-[11px] font-bold text-right text-white/90">UNIT PRICE</div>
-                  <div className="px-3 py-3 text-[11px] font-bold text-right text-white/90">AMOUNT</div>
+              <div className="border border-slate-300 overflow-hidden">
+                <div className="grid grid-cols-[44px_1fr_72px_88px_88px] bg-slate-200 border-b border-slate-300">
+                  <div className="px-2 py-2.5 text-[11px] font-bold text-slate-800 text-center border-r border-slate-300">Item No.</div>
+                  <div className="px-3 py-2.5 text-[11px] font-bold text-slate-800 border-r border-slate-300">Product Details</div>
+                  <div className="px-2 py-2.5 text-[11px] font-bold text-slate-800 text-right border-r border-slate-300">Quantity</div>
+                  <div className="px-2 py-2.5 text-[11px] font-bold text-slate-800 text-right border-r border-slate-300">Price</div>
+                  <div className="px-2 py-2.5 text-[11px] font-bold text-slate-800 text-right">Total</div>
                 </div>
 
-                {/* Items */}
                 {q.items.length === 0 ? (
                   <div className="px-4 py-6 text-center text-[13px] text-slate-400">No line items</div>
                 ) : (
-                  <div className="divide-y divide-slate-100">
+                  <div className="divide-y divide-slate-200 bg-white">
                     {q.items.map((item, idx) => (
                       <div
                         key={item.id}
-                        className={`grid grid-cols-[32px_1fr_80px_110px_110px] items-start ${idx % 2 === 0 ? "bg-white" : "bg-slate-50/60"}`}
+                        className={`grid grid-cols-[44px_1fr_72px_88px_88px] items-start ${idx % 2 === 1 ? "bg-slate-50/50" : ""}`}
                       >
-                        <div className="flex items-center justify-center py-3 text-[11px] text-slate-400 font-semibold">
+                        <div className="flex items-center justify-center py-3 text-[12px] text-slate-700 font-semibold border-r border-slate-200">
                           {idx + 1}
                         </div>
-                        <div className="px-4 py-3">
-                          <p className="text-[13px] font-semibold text-slate-800 leading-snug">
-                            {item.productName || <span className="text-slate-300 italic">—</span>}
+                        <div className="px-3 py-3 border-r border-slate-200">
+                          <p className="text-[13px] font-bold text-slate-900 leading-snug">
+                            {item.productName || <span className="text-slate-400 font-normal italic">—</span>}
                           </p>
-                          {item.description && (
-                            <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">{item.description}</p>
-                          )}
+                          {item.description ? (
+                            <p className="text-[12px] text-slate-700 mt-1 leading-snug font-normal">{item.description}</p>
+                          ) : null}
                         </div>
-                        <div className="px-3 py-3 text-[13px] text-slate-700 text-center font-medium">
-                          {item.quantity}
+                        <div className="px-2 py-3 text-[12px] text-slate-800 text-right font-medium border-r border-slate-200 tabular-nums">
+                          {item.quantity || "—"}
                         </div>
-                        <div className="px-3 py-3 text-[13px] text-slate-700 text-right tabular-nums">
-                          {item.listPrice ? `$${item.listPrice}` : "—"}
+                        <div className="px-2 py-3 text-[12px] text-slate-800 text-right tabular-nums border-r border-slate-200">
+                          {formatItemUnitPrice(item.listPrice)}
                         </div>
-                        <div className="px-3 py-3 text-[13px] font-bold text-slate-800 text-right tabular-nums">
-                          {item.amount ? `$${item.amount}` : "—"}
+                        <div className="px-2 py-3 text-[12px] font-bold text-slate-900 text-right tabular-nums">
+                          {item.amount ? fmtTemplate(parseMoney(item.amount)) : "—"}
                         </div>
                       </div>
                     ))}
                   </div>
                 )}
 
-                {/* Totals footer */}
-                <div className="border-t-2 border-slate-200 bg-slate-50 px-4 py-3">
+                {/* Totals — dashed separator */}
+                <div className="border-t border-dashed border-slate-400 bg-white px-4 py-4">
                   <div className="flex justify-end">
-                    <div className="space-y-1.5 min-w-[220px]">
-                      <div className="flex justify-between text-[12px] text-slate-600">
-                        <span>Subtotal</span>
-                        <span className="tabular-nums font-medium">{fmt(subtotal)}</span>
+                    <div className="space-y-1.5 min-w-[240px]">
+                      <div className="flex justify-between text-[12px] text-slate-800 gap-8">
+                        <span>Sub Total</span>
+                        <span className="tabular-nums">{fmtTemplate(subtotal)}</span>
                       </div>
                       {discount !== 0 && (
-                        <div className="flex justify-between text-[12px] text-slate-600">
+                        <div className="flex justify-between text-[12px] text-slate-800 gap-8">
                           <span>Discount</span>
-                          <span className="tabular-nums text-red-600">−{fmt(discount)}</span>
+                          <span className="tabular-nums text-red-700">−{fmtTemplate(discount)}</span>
                         </div>
                       )}
-                      {tax !== 0 && (
-                        <div className="flex justify-between text-[12px] text-slate-600">
-                          <span>Tax</span>
-                          <span className="tabular-nums">{fmt(tax)}</span>
-                        </div>
-                      )}
-                      {adjustment !== 0 && (
-                        <div className="flex justify-between text-[12px] text-slate-600">
-                          <span>Adjustment</span>
-                          <span className="tabular-nums">{adjustment >= 0 ? fmt(adjustment) : `−${fmt(Math.abs(adjustment))}`}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between text-[15px] font-black text-slate-900 border-t-2 border-slate-200 pt-2 mt-2">
-                        <span>GRAND TOTAL (PRODUCT)</span>
-                        <span className="tabular-nums text-[#002f93]">{fmt(grandTotal)}</span>
+                      <div className="flex justify-between text-[12px] text-slate-800 gap-8">
+                        <span>Tax</span>
+                        <span className="tabular-nums">{fmtTemplate(tax)}</span>
                       </div>
-                      <QuotePricingCostBreakdown q={q} omitProductLine className="text-left min-w-[220px]" />
+                      <div className="flex justify-between text-[12px] text-slate-800 gap-8">
+                        <span>Adjustment</span>
+                        <span className="tabular-nums">{fmtTemplate(adjustment)}</span>
+                      </div>
+                      <div className="flex justify-between text-[13px] font-bold text-slate-900 gap-8 pt-1 border-t border-slate-300 mt-1">
+                        <span>Total</span>
+                        <span className="tabular-nums">{fmtTemplate(grandTotal)}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Notes */}
-            {(q.orderNotes || q.description) && (
-              <div className="px-8 pb-5">
-                <div className="grid grid-cols-2 gap-4">
-                  {q.orderNotes && (
-                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Order Notes</p>
-                      <p className="text-[12px] text-slate-700 leading-relaxed">{q.orderNotes}</p>
-                    </div>
+            {/* Terms and Conditions */}
+            <div className="px-8 pb-6">
+              <div className="rounded-xl border border-slate-300 bg-slate-50/50 overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-slate-200 bg-slate-100/80">
+                  <p className="text-[12px] font-bold text-slate-700">Terms and Conditions</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mt-0.5">Description</p>
+                </div>
+                <div className="px-4 py-4 min-h-[5rem]">
+                  {q.termsAndConditions?.trim() ? (
+                    <p className="text-[12px] text-slate-800 leading-relaxed whitespace-pre-wrap">
+                      {q.termsAndConditions}
+                    </p>
+                  ) : (
+                    <p className="text-[12px] text-slate-400 italic">No terms and conditions on file for this quote.</p>
                   )}
-                  {q.description && (
-                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Description</p>
-                      <p className="text-[12px] text-slate-700 leading-relaxed">{q.description}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Terms & Conditions */}
-            {q.termsAndConditions && (
-              <div className="px-8 pb-6">
-                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-                  <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2">Terms & Conditions</p>
-                  <p className="text-[12px] text-slate-600 leading-relaxed whitespace-pre-wrap">{q.termsAndConditions}</p>
-                </div>
-              </div>
-            )}
-
-            {/* Signature area */}
-            <div className="px-8 pb-8">
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <div className="h-12 border-b-2 border-slate-300 mb-1" />
-                  <p className="text-[11px] text-slate-400">Customer Signature &amp; Date</p>
-                </div>
-                <div>
-                  <div className="h-12 border-b-2 border-slate-300 mb-1" />
-                  <p className="text-[11px] text-slate-400">Authorized Signature &amp; Date</p>
                 </div>
               </div>
             </div>
 
-          </div>{/* end scrollable body */}
+            {/* Additional context (not on customer PDF template) */}
+            <details className="px-8 pb-6 group">
+              <summary className="text-[12px] font-semibold text-slate-500 cursor-pointer mb-2 select-none">
+                Additional details
+              </summary>
+              <div className="mt-3 space-y-4 border border-slate-200 rounded-lg p-4 bg-slate-50/80">
+                {(q.subject || q.orderNotes || q.description) && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[12px]">
+                    {q.subject && (
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Subject</p>
+                        <p className="text-slate-800 font-medium">{q.subject}</p>
+                      </div>
+                    )}
+                    {q.orderNotes && (
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Order notes</p>
+                        <p className="text-slate-700 leading-relaxed">{q.orderNotes}</p>
+                      </div>
+                    )}
+                    {q.description && (
+                      <div className="sm:col-span-2">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Description</p>
+                        <p className="text-slate-700 leading-relaxed">{q.description}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-x-6 gap-y-1 text-[12px] text-slate-600">
+                  <span><span className="text-slate-400">Prepared by:</span> <span className="font-semibold">{q.opportunityOwner || "—"}</span></span>
+                  <span><span className="text-slate-400">Business type:</span> {q.businessType || "—"}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-6 pt-2">
+                  <div>
+                    <div className="h-10 border-b border-slate-300 mb-1" />
+                    <p className="text-[11px] text-slate-400">Customer signature &amp; date</p>
+                  </div>
+                  <div>
+                    <div className="h-10 border-b border-slate-300 mb-1" />
+                    <p className="text-[11px] text-slate-400">Authorized signature &amp; date</p>
+                  </div>
+                </div>
+              </div>
+            </details>
+
+          </div>
         </div>
       </div>
 

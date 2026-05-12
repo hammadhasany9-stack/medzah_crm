@@ -329,7 +329,7 @@ export default function OpportunityDetailPage() {
             <ArrowLeft size={16} />
           </button>
           <div className="flex items-center gap-2 flex-wrap min-w-0">
-            <span className="text-base font-bold text-slate-900 truncate">🏆 {opp.opportunityName}</span>
+            <span className="text-base font-bold text-slate-900 truncate">🏆 {opp.accountName}</span>
             <SourceBadge source={opp.leadSource} />
             <PriorityBadge priority={opp.leadPriority} />
           </div>
@@ -363,7 +363,7 @@ export default function OpportunityDetailPage() {
                   <p className="text-sm font-semibold text-slate-900">Delete this opportunity?</p>
                   <p className="text-xs text-slate-500 leading-relaxed">
                     This action cannot be undone. All data for{" "}
-                    <span className="font-medium text-slate-700">{opp.opportunityName}</span> will be removed.
+                    <span className="font-medium text-slate-700">{opp.accountName}</span> will be removed.
                   </p>
                   <div className="flex gap-2">
                     <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50">Cancel</button>
@@ -491,7 +491,7 @@ export default function OpportunityDetailPage() {
                     value={`📅 ${formatClosingDate(opp.closingDate)}`}
                     highlight={closingIsPast}
                   />
-                  <Cell label="Opportunity Name"   value={opp.opportunityName} />
+                  <Cell label="Account Name"   value={opp.accountName} />
                   <Cell label="Expected Revenue"   value={opp.expectedRevenue ? `💰 ${opp.expectedRevenue}` : undefined} />
                   <Cell label="Account Name"        value={opp.accountName} />
                   <Cell label="Amount"              value={opp.amount} />

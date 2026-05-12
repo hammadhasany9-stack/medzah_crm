@@ -287,7 +287,7 @@ function downloadQuote(opportunity: Opportunity) {
     [],
     ["Quote Subject", q.subject],
     ["Account Name", q.accountName],
-    ["Opportunity Name", q.opportunityName],
+    ["Account Name", q.accountName],
     ["Quote Stage", q.quoteStage],
     ["Valid Date", q.validDate],
     ["Contact Name", q.contactName],
@@ -538,7 +538,7 @@ export function NegotiationStageChangeModal({
                   {/* Left */}
                   <div className="space-y-3.5">
                     <ReadOnlyField label="Opportunity Owner" value={opportunity.assignedTo} />
-                    <ReadOnlyField label="Opportunity Name" value={opportunity.opportunityName} />
+                    <ReadOnlyField label="Account Name" value={opportunity.accountName} />
                     <ReadOnlyField label="Account Name" value={opportunity.accountName} />
                     <ReadOnlyField label="Contact Name" value={opportunity.contactName} />
                     <ReadOnlyField label="Pipeline" value={opportunity.pipeline} />

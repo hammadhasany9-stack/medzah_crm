@@ -50,7 +50,6 @@ const selectCls = "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg f
 interface FormState {
   opportunityId:    string;
   opportunityOwner: string;
-  opportunityName:  string;
   accountName:      string;
   businessType:     string;
   closingDate:      string;
@@ -75,7 +74,6 @@ function oppToForm(opp: Opportunity): FormState {
   return {
     opportunityId:    opp.opportunityRef,
     opportunityOwner: opp.assignedTo,
-    opportunityName:  opp.opportunityName,
     accountName:      opp.accountName,
     businessType:     opp.businessType,
     closingDate,
@@ -127,7 +125,6 @@ export default function EditOpportunityPage() {
     return {
       ...opp,
       opportunityRef:   form.opportunityId,
-      opportunityName:  form.opportunityName || "Untitled Opportunity",
       accountName:      form.accountName,
       businessType:     form.businessType,
       closingDate:      form.closingDate,
@@ -270,16 +267,6 @@ export default function EditOpportunityPage() {
                 </select>
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">▾</span>
               </div>
-            </Field>
-
-            {/* Opportunity Name */}
-            <Field label="Opportunity Name" required>
-              <input
-                value={form.opportunityName}
-                onChange={(e) => set("opportunityName", e.target.value)}
-                placeholder="Enter opportunity name"
-                className={inputCls}
-              />
             </Field>
 
             {/* Account Name */}

@@ -80,10 +80,15 @@ export interface Lead {
   createdDate: string;
   note: string;
   activities: ActivityEvent[];
+  /** Optional — captured on lead create/edit when available. */
+  website?: string;
+  industry?: string;
+  gender?: string;
+  firstName?: string;
+  lastName?: string;
 }
 
 export interface OpportunityData {
-  opportunityName: string;
   accountName: string;
   businessType: string;
   closingDate: string;
@@ -95,6 +100,26 @@ export interface OpportunityData {
   description: string;
   followUpDate: string;
   leadPriority: Priority;
+  /** When creating from CRM-linked customer flow. */
+  customerType?: AllocationCustomerType;
+  linkedAccountId?: string;
+  linkedContactId?: string;
+  /** Populated when linking an existing contact; used on the opportunity record. */
+  contactEmail?: string;
+  contactPhone?: string;
+  /** New account fields when not using an existing CRM account. */
+  accountWebsite?: string;
+  accountIndustry?: string;
+  /** New contact fields when not using an existing CRM contact. */
+  contactFirstName?: string;
+  contactLastName?: string;
+  contactGender?: string;
+  /** General address when capturing new account/contact (also used for CRM sync). */
+  addressStreet?: string;
+  addressCity?: string;
+  addressState?: string;
+  addressZip?: string;
+  addressCountry?: string;
 }
 
 export type OpportunityStage =
@@ -163,7 +188,6 @@ export interface QuoteData {
   businessType: string;
   urgency: string;
   opportunityOwner: string;
-  opportunityName: string;
   quoteStage: string;
   validDate: string;
   contactName: string;
@@ -217,7 +241,6 @@ export interface QuoteData {
 export interface Opportunity {
   id: string;
   opportunityRef: string;
-  opportunityName: string;
   accountName: string;
   businessType: string;
   closingDate: string;
@@ -249,6 +272,14 @@ export interface Opportunity {
   procurementAllocation?: ProcurementAllocation;
   leadId?: string;
   allocationId?: string;
+  customerType?: AllocationCustomerType;
+  linkedAccountId?: string;
+  linkedContactId?: string;
+  accountWebsite?: string;
+  accountIndustry?: string;
+  contactFirstName?: string;
+  contactLastName?: string;
+  contactGender?: string;
   closedLostReason?: ClosedLostReason;
   /** Extra context when closing lost (distinct from opportunity description/note). */
   closedLostDescription?: string;
@@ -290,6 +321,16 @@ export interface Contract {
   contactName: string;
   customer: ContractCustomerSnapshot;
   lineItems: ContractLineItem[];
+  /** Mirrors proposal modal (opportunity quote); payment terms also drive `paymentDue` when syncing from quote. */
+  expectedDemand: string;
+  deliveryLocations: string;
+  deliveryLocationCount: string;
+  /** yyyy-mm-dd from proposal */
+  firstOrderDeliveryDate: string;
+  freightResponsibility: string;
+  deliveryCharges: string;
+  carrierBillingMethod: string;
+  customerShippingAccountNumber: string;
   paymentMethod: string;
   paymentDue: string;
   advancePayment: string;
@@ -307,6 +348,11 @@ export interface Contract {
   customPricingNotes: string;
   discounts: string;
   contractSpecificAgreements: string;
+  /** Selected template filename under `public/` (e.g. `… agreement.docx`). */
+  contractTemplateFile?: string;
+  contractUploadedFileName?: string;
+  /** Base64 data URL from uploaded `.doc` / `.docx`. */
+  contractUploadedDataUrl?: string;
   sellerName?: string;
   buyerName?: string;
   sellerSignedAt?: string;
@@ -419,3 +465,22 @@ export function safeAllocationStatus(
     ? s
     : "Pending";
 }
+
+export type {
+  LeadAttachmentRecord,
+  LeadCallDirection,
+  LeadCallLogRecord,
+  LeadCallStatus,
+  LeadEngagementNoteRecord,
+  LeadEngagementTaskRecord,
+  LeadLeadCommentRecord,
+  LeadSentEmailRecord,
+  LeadTaskAssignee,
+  LeadTaskStatus,
+  TaskPriority,
+} from "./lead-engagement";
+export {
+  LEAD_CALL_DIRECTIONS,
+  LEAD_CALL_STATUSES,
+  LEAD_TASK_STATUSES,
+} from "./lead-engagement";

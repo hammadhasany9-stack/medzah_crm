@@ -446,7 +446,7 @@ export function OpportunityDetailPanel({ opportunity, onClose, onCreateQuote }: 
                             <p className="text-sm font-semibold text-slate-900">Delete this opportunity?</p>
                             <p className="text-xs text-slate-500 leading-relaxed">
                               This action cannot be undone. All data associated with{" "}
-                              <span className="font-medium text-slate-700">{opportunity.opportunityName}</span> will be permanently removed.
+                              <span className="font-medium text-slate-700">{opportunity.accountName}</span> will be permanently removed.
                             </p>
                           </div>
                           <div className="flex gap-2">
@@ -481,7 +481,7 @@ export function OpportunityDetailPanel({ opportunity, onClose, onCreateQuote }: 
 
               {/* Opportunity name */}
               <h2 className="text-base font-bold text-slate-900 leading-snug">
-                🏆 {opportunity.opportunityName}
+                🏆 {opportunity.accountName}
               </h2>
 
               {/* Avatar + contact + stage dot */}
@@ -647,7 +647,7 @@ export function OpportunityDetailPanel({ opportunity, onClose, onCreateQuote }: 
                   More Details
                 </p>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-4">
-                  <DetailCell label="Opportunity Name"  value={opportunity.opportunityName} />
+                  <DetailCell label="Account Name"  value={opportunity.accountName} />
                   <DetailCell label="Opportunity Owner" value={opportunity.assignedTo} />
                   <DetailCell
                     label="Account Name"

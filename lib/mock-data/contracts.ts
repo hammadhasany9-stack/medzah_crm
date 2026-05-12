@@ -5,6 +5,7 @@ import type {
   Opportunity,
   QuoteData,
 } from "@/lib/types";
+import { CONTRACT_TEMPLATE_OPTIONS } from "@/lib/contract-templates";
 
 export const CONTRACTS_STORAGE_KEY = "medzah_crm_contracts_v1";
 
@@ -54,6 +55,78 @@ export function customerSnapshotFromOpportunity(o: Opportunity): Contract["custo
     accountName: o.accountName,
     contactName: o.contactName,
     companyDetails: [o.companyName, addr].filter(Boolean).join(" · "),
+  };
+}
+
+/** Maps proposal “Freight responsibility” to contract Seller/Buyer. */
+export function freightResponsibilityToShipping(fr: string): Contract["shippingResponsibility"] {
+  const t = fr.trim();
+  if (t === "Customer pays freight") return "Buyer";
+  if (t === "We cover freight") return "Seller";
+  return "Seller";
+}
+
+export function shippingResponsibilityToFreight(sr: Contract["shippingResponsibility"]): string {
+  return sr === "Buyer" ? "Customer pays freight" : "We cover freight";
+}
+
+function normalizeQuoteDateInput(iso: string | undefined): string {
+  if (!iso?.trim()) return "";
+  const s = iso.trim();
+  return s.includes("T") ? (s.split("T")[0] ?? "") : s;
+}
+
+/** Summary written to `deliveryTimeline` when syncing from quote (overwrites prior timeline). */
+export function buildDeliveryTimelineSummaryFromQuote(q: QuoteData): string {
+  const parts: string[] = [];
+  const loc = q.deliveryLocations?.trim();
+  if (loc === "Multi-site") {
+    const n = q.deliveryLocationCount?.trim();
+    parts.push(n ? `Multi-site (${n} locations)` : "Multi-site");
+  } else if (loc === "Single site") {
+    parts.push("Single site");
+  }
+  const raw = q.firstOrderDeliveryDate?.trim();
+  if (raw) {
+    const day = raw.includes("T") ? (raw.split("T")[0] ?? raw) : raw;
+    const d = new Date(raw.includes("T") ? raw : `${day}T12:00:00`);
+    const label = Number.isNaN(d.getTime())
+      ? day
+      : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    parts.push(`First order delivery: ${label}`);
+  }
+  return parts.join(" · ");
+}
+
+/** Proposal commercial / logistics / shipping fields plus overlapping contract fields (overwrite). */
+export function proposalSnapshotFromQuoteData(q: QuoteData): Pick<
+  Contract,
+  | "expectedDemand"
+  | "deliveryLocations"
+  | "deliveryLocationCount"
+  | "firstOrderDeliveryDate"
+  | "freightResponsibility"
+  | "deliveryCharges"
+  | "carrierBillingMethod"
+  | "customerShippingAccountNumber"
+  | "paymentDue"
+  | "shippingResponsibility"
+  | "deliveryTimeline"
+  | "deliveryMethod"
+> {
+  return {
+    paymentDue: q.paymentTerms?.trim() || "",
+    expectedDemand: q.expectedDemand?.trim() || "",
+    deliveryLocations: q.deliveryLocations?.trim() || "",
+    deliveryLocationCount: q.deliveryLocationCount?.trim() || "",
+    firstOrderDeliveryDate: normalizeQuoteDateInput(q.firstOrderDeliveryDate),
+    freightResponsibility: q.freightResponsibility?.trim() || "",
+    deliveryCharges: q.deliveryCharges?.trim() || "",
+    carrierBillingMethod: q.carrierBillingMethod?.trim() || "",
+    customerShippingAccountNumber: q.customerShippingAccountNumber?.trim() || "",
+    shippingResponsibility: freightResponsibilityToShipping(q.freightResponsibility || ""),
+    deliveryTimeline: buildDeliveryTimelineSummaryFromQuote(q),
+    deliveryMethod: q.shippingMethod?.trim() || "",
   };
 }
 
@@ -118,6 +191,14 @@ export const INITIAL_CONTRACTS: Contract[] = (() => {
     customPricingNotes: "Volume tier reviewed annually at renewal.",
     discounts: "Additional 2% for annual prepay (optional).",
     contractSpecificAgreements: "Training day included with first shipment (max 4 attendees).",
+    expectedDemand: "",
+    deliveryLocations: "",
+    deliveryLocationCount: "",
+    firstOrderDeliveryDate: "",
+    freightResponsibility: "",
+    deliveryCharges: "",
+    carrierBillingMethod: "",
+    customerShippingAccountNumber: "",
     createdAt: t0,
     updatedAt: t0,
   };
@@ -162,6 +243,14 @@ export const INITIAL_CONTRACTS: Contract[] = (() => {
     customPricingNotes: "CPI adjustment capped at 3% YoY.",
     discounts: "Bundle discount already in quote total.",
     contractSpecificAgreements: "Uptime SLA 99.5% measured monthly.",
+    expectedDemand: "",
+    deliveryLocations: "",
+    deliveryLocationCount: "",
+    firstOrderDeliveryDate: "",
+    freightResponsibility: "",
+    deliveryCharges: "",
+    carrierBillingMethod: "",
+    customerShippingAccountNumber: "",
     sellerName: "Kevin Calamari",
     buyerName: "Dr. Priya Sharma",
     sellerSignedAt: "2026-04-14T16:20:00.000Z",
@@ -206,6 +295,14 @@ export const INITIAL_CONTRACTS: Contract[] = (() => {
     customPricingNotes: "Pilot pricing under review.",
     discounts: "",
     contractSpecificAgreements: "",
+    expectedDemand: "",
+    deliveryLocations: "",
+    deliveryLocationCount: "",
+    firstOrderDeliveryDate: "",
+    freightResponsibility: "",
+    deliveryCharges: "",
+    carrierBillingMethod: "",
+    customerShippingAccountNumber: "",
     createdAt: "2026-04-19T08:00:00.000Z",
     updatedAt: "2026-04-19T08:00:00.000Z",
   };
@@ -224,7 +321,18 @@ export function normalizeContractStatus(raw: string | undefined | null): Contrac
 }
 
 export function normalizeContractRecord(c: Contract): Contract {
-  return { ...c, status: normalizeContractStatus(String(c.status ?? "")) };
+  return {
+    ...c,
+    status: normalizeContractStatus(String(c.status ?? "")),
+    expectedDemand: c.expectedDemand ?? "",
+    deliveryLocations: c.deliveryLocations ?? "",
+    deliveryLocationCount: c.deliveryLocationCount ?? "",
+    firstOrderDeliveryDate: c.firstOrderDeliveryDate ?? "",
+    freightResponsibility: c.freightResponsibility ?? "",
+    deliveryCharges: c.deliveryCharges ?? "",
+    carrierBillingMethod: c.carrierBillingMethod ?? "",
+    customerShippingAccountNumber: c.customerShippingAccountNumber ?? "",
+  };
 }
 
 function mapStoredContracts(list: Contract[]): Contract[] {
@@ -272,12 +380,14 @@ export function buildNewContract(contracts: Contract[]): Contract {
   const id = `contract-${Math.random().toString(36).slice(2, 11)}`;
   const now = new Date().toISOString();
   const day = now.slice(0, 10);
+  const firstTpl = CONTRACT_TEMPLATE_OPTIONS[0];
   return {
     id,
     contractRef: nextContractRef(contracts),
     status: "draft",
     name: "",
-    type: "Supply & Service",
+    type: firstTpl.label,
+    contractTemplateFile: firstTpl.fileName,
     term: "1 year",
     effectiveDate: day,
     effectiveAt: `${day}T12:00:00.000Z`,
@@ -287,6 +397,14 @@ export function buildNewContract(contracts: Contract[]): Contract {
     contactName: "",
     customer: { accountName: "", contactName: "", companyDetails: "" },
     lineItems: [],
+    expectedDemand: "",
+    deliveryLocations: "",
+    deliveryLocationCount: "",
+    firstOrderDeliveryDate: "",
+    freightResponsibility: "",
+    deliveryCharges: "",
+    carrierBillingMethod: "",
+    customerShippingAccountNumber: "",
     paymentMethod: "",
     paymentDue: "Net 30",
     advancePayment: "",

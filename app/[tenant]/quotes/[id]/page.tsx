@@ -178,7 +178,7 @@ export default function QuoteDetailPage() {
               {opp.companyName || opp.accountName}
             </span>
             <span className="text-slate-300">&rsaquo;</span>
-            <span className="font-semibold text-slate-800 truncate">{opp.opportunityName}</span>
+            <span className="font-semibold text-slate-800 truncate">{opp.accountName}</span>
           </div>
           <StatusBadge status={opp.quoteStatus} />
         </div>
@@ -230,7 +230,7 @@ export default function QuoteDetailPage() {
               <Cell label="Account Name"            value={q.accountName} />
               <Cell label="Quote Stage"             value={q.quoteStage} />
               <Cell label="Order Submittal Method"  value={q.orderSubmittalMethod} />
-              <Cell label="Opportunity Name"        value={q.opportunityName} />
+              <Cell label="Account Name"        value={q.accountName} />
               <Cell label="Business Type"           value={q.businessType} />
               <Cell label="Shipping Method"         value={q.shippingMethod} />
               <Cell label="Customer PO"             value={q.customerPO || "—"} />

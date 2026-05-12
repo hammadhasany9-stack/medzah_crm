@@ -17,18 +17,6 @@ interface PageConfig {
 }
 
 function getPageConfig(pathname: string): PageConfig {
-  if (pathname.startsWith("/allocation")) {
-    return {
-      title: "Allocation",
-      myTabLabel: "My Allocations",
-      createLabel: "Create Allocation",
-      createHref: "/allocation/create",
-      searchPlaceholder: "Search allocations...",
-      showTabs: false,
-      showSearch: false,
-      showCreate: false,
-    };
-  }
   if (pathname.startsWith("/opportunity")) {
     return {
       title: "Opportunity",

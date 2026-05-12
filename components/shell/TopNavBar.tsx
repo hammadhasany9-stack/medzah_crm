@@ -53,7 +53,7 @@ export function TopNavBar({
         <Suspense
           fallback={
             <div
-              className="min-h-[56px] bg-[#0F172A] border-b border-white/10"
+              className="min-h-[56px] bg-white border-b border-slate-200"
               aria-hidden
             />
           }
@@ -134,7 +134,7 @@ export function TopNavBar({
           onCreateClick ? (
             <button
               onClick={onCreateClick}
-              className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold bg-slate-900 text-white rounded-lg hover:bg-black transition-colors"
+              className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold bg-[#002f93] text-white rounded-lg hover:bg-[#0038b3] transition-colors"
             >
               <Plus size={14} />
               {createLabel}
@@ -142,7 +142,7 @@ export function TopNavBar({
           ) : (
             <Link
               href={createHref}
-              className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold bg-slate-900 text-white rounded-lg hover:bg-black transition-colors"
+              className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold bg-[#002f93] text-white rounded-lg hover:bg-[#0038b3] transition-colors"
             >
               <Plus size={14} />
               {createLabel}

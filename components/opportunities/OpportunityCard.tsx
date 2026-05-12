@@ -289,7 +289,7 @@ export function OpportunityCard({
           {/* Opportunity name */}
           <div>
             <h3 className="text-[14px] font-bold text-slate-900 leading-snug line-clamp-2">
-              🏆 {opportunity.opportunityName}
+              🏆 {opportunity.accountName}
             </h3>
           </div>
 

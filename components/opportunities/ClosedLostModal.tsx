@@ -240,7 +240,7 @@ export function ClosedLostModal({ opportunity, onConfirm, onCancel }: ClosedLost
                   {/* Left */}
                   <div className="space-y-3.5">
                     <ReadOnlyField label="Opportunity Owner" value={opportunity.assignedTo} />
-                    <ReadOnlyField label="Opportunity Name" value={opportunity.opportunityName} />
+                    <ReadOnlyField label="Account Name" value={opportunity.accountName} />
                     <ReadOnlyField
                       label="Expected Revenue"
                       value={

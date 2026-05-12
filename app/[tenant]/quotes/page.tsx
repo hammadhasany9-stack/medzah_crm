@@ -130,7 +130,7 @@ export default function QuotesPage() {
         o.quoteData?.subject?.toLowerCase().includes(q) ||
         o.quoteData?.contactName?.toLowerCase().includes(q) ||
         o.quoteData?.accountName?.toLowerCase().includes(q) ||
-        o.opportunityName?.toLowerCase().includes(q) ||
+        o.accountName?.toLowerCase().includes(q) ||
         (o.quoteData?.quoteId?.toLowerCase().includes(q) ?? false)
       );
     }

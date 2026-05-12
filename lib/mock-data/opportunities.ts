@@ -18,7 +18,6 @@ function luminaQuote(): QuoteData {
     businessType: "Existing Business",
     urgency: "High",
     opportunityOwner: "Kevin Calamari",
-    opportunityName: "Lumina OR expansion",
     quoteStage: "Delivered",
     validDate: "2026-05-01T12:00:00.000Z",
     contactName: "Alara Kalila",
@@ -75,7 +74,6 @@ function meridianQuote(): QuoteData {
     businessType: "New Business",
     urgency: "Medium",
     opportunityOwner: "Kevin Calamari",
-    opportunityName: "Meridian monitoring",
     quoteStage: "Delivered",
     validDate: "2026-06-15T12:00:00.000Z",
     contactName: "Dr. Priya Sharma",
@@ -132,7 +130,6 @@ function capstoneQuote(): QuoteData {
     businessType: "Existing Business",
     urgency: "Low",
     opportunityOwner: "Kevin Calamari",
-    opportunityName: "Capstone consumables",
     quoteStage: "Draft",
     validDate: "2026-07-01T12:00:00.000Z",
     contactName: "Marcus Webb",
@@ -186,7 +183,6 @@ function ridgefieldQuote(): QuoteData {
     businessType: "New Business",
     urgency: "Medium",
     opportunityOwner: "Kevin Calamari",
-    opportunityName: "Ridgefield pilot quote",
     quoteStage: "Delivered",
     validDate: "2026-06-01T12:00:00.000Z",
     contactName: "Jordan Lee",
@@ -237,7 +233,6 @@ export const mockOpportunities: Opportunity[] = [
   {
     id: "opp-seed-lumina",
     opportunityRef: "P-48201",
-    opportunityName: "Lumina OR expansion",
     accountName: "Lumina Architecture",
     businessType: "Existing Business",
     closingDate: "2026-05-01",
@@ -272,7 +267,6 @@ export const mockOpportunities: Opportunity[] = [
   {
     id: "opp-seed-meridian",
     opportunityRef: "P-48202",
-    opportunityName: "Meridian monitoring",
     accountName: "Meridian Healthcare Group",
     businessType: "New Business",
     closingDate: "2026-06-15",
@@ -308,7 +302,6 @@ export const mockOpportunities: Opportunity[] = [
   {
     id: "opp-seed-capstone",
     opportunityRef: "P-48203",
-    opportunityName: "Capstone consumables",
     accountName: "Capstone Medical",
     businessType: "Existing Business",
     closingDate: "2026-07-01",
@@ -343,7 +336,6 @@ export const mockOpportunities: Opportunity[] = [
   {
     id: "opp-seed-ridgefield",
     opportunityRef: "P-48299",
-    opportunityName: "Ridgefield pilot quote",
     accountName: "Ridgefield Labs",
     businessType: "New Business",
     closingDate: "2026-08-01",

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useTenantRouter } from "@/components/providers/TenantProvider";
+import Link from "next/link";
 import { TenantLink } from "@/components/providers/TenantLink";
 import {
   ArrowLeft,
@@ -18,7 +19,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  CustomerIntakeRecord,
   getCustomerIntakeById,
   deleteCustomerIntake,
 } from "@/lib/mock-data/customer-intake";
@@ -124,16 +124,12 @@ function DeleteModal({ name, onConfirm, onCancel }: {
 export default function CustomerIntakeViewPage() {
   const { id } = useParams<{ id: string }>();
   const router = useTenantRouter();
-  const [record, setRecord] = useState<CustomerIntakeRecord | null>(null);
-  const [notFound, setNotFound] = useState(false);
+  const record = useMemo(
+    () => (typeof id === "string" ? getCustomerIntakeById(id) : null),
+    [id]
+  );
   const [showDelete, setShowDelete] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "timeline">("overview");
-
-  useEffect(() => {
-    const found = getCustomerIntakeById(id);
-    if (found) setRecord(found);
-    else setNotFound(true);
-  }, [id]);
 
   function handleDelete() {
     deleteCustomerIntake(id);
@@ -142,7 +138,7 @@ export default function CustomerIntakeViewPage() {
 
   // ── Loading / not-found states ─────────────────────────────────────────────
 
-  if (notFound) {
+  if (!record) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 p-6">
         <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
@@ -155,22 +151,6 @@ export default function CustomerIntakeViewPage() {
       </div>
     );
   }
-
-  if (!record) {
-    return (
-      <div className="flex items-center justify-center h-full p-6">
-        <div className="w-8 h-8 rounded-full border-2 border-[#002f93] border-t-transparent animate-spin" />
-      </div>
-    );
-  }
-
-  const primaryContactName = [record.primaryContactFirstName, record.primaryContactLastName]
-    .filter(Boolean)
-    .join(" ") || null;
-
-  const apName = [record.accountsPayableFirstName, record.accountsPayableLastName]
-    .filter(Boolean)
-    .join(" ") || null;
 
   const primaryAddress = [
     record.primaryAddressStreet,
@@ -227,6 +207,19 @@ export default function CustomerIntakeViewPage() {
 
         {/* Main panel */}
         <div className="flex-1 min-w-0 flex flex-col gap-4">
+          {record.status !== "Onboarding Complete" && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50/90 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <p className="text-sm text-amber-900 font-medium">
+                Onboarding is not complete. Finish the remaining details to send this intake for approval.
+              </p>
+              <Link
+                href={`/crm-onboarding/${record.id}`}
+                className="inline-flex justify-center px-4 py-2 text-sm font-semibold bg-[#002f93] text-white rounded-lg hover:bg-[#002070] whitespace-nowrap"
+              >
+                Finish onboarding
+              </Link>
+            </div>
+          )}
 
           {/* Profile card */}
           <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
@@ -337,7 +330,7 @@ export default function CustomerIntakeViewPage() {
                   <Field label="Customer For" value={record.customerFor} />
                   <Field label="Customer Intake Owner" value={record.intakeOwner} />
 
-                  <Field label="Customer Name" value={record.customerName} />
+                  <Field label="Account name" value={record.customerName} />
                   <Field
                     label="Secondary Email"
                     value={record.secondaryEmail}

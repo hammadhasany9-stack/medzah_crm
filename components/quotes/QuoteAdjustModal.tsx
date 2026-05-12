@@ -1,10 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { X, Trash2, Plus, Calendar, FileSpreadsheet, PackageSearch, ChevronDown } from "lucide-react";
+import { X, Trash2, Plus, Calendar, ChevronDown } from "lucide-react";
 import { Opportunity, QuoteData, QuoteItem, QuoteRecord } from "@/lib/types";
-import { useCRMShell } from "@/components/shell/CRMShellContext";
-import { AllocationRecordDetailContent } from "@/components/leads/ViewAllocationModal";
 import type { ProductCatalogItem } from "@/lib/mock-data/products";
 import { QuoteProductNamePicker } from "@/components/quotes/QuoteProductNamePicker";
 import { getAccountNamesForContactsPicker } from "@/lib/mock-data/accounts";
@@ -324,15 +322,11 @@ interface QuoteAdjustModalProps {
   onCancel: () => void;
 }
 
-type QuoteModalDetailTab = "quote" | "allocation";
-
 // ─── Modal ────────────────────────────────────────────────────────────────────
 
 export function QuoteAdjustModal({ opportunity, onSubmit, onCancel }: QuoteAdjustModalProps) {
-  const [detailTab, setDetailTab] = useState<QuoteModalDetailTab>("quote");
   const [quoteVersionTab, setQuoteVersionTab] = useState<"current" | "old">("current");
-  const { allocations } = useCRMShell();
-  const { quoteData, procurementAllocation } = opportunity;
+  const { quoteData } = opportunity;
 
   const oldRecord =
     opportunity.quoteHistory && opportunity.quoteHistory.length > 0
@@ -342,10 +336,6 @@ export function QuoteAdjustModal({ opportunity, onSubmit, onCancel }: QuoteAdjus
   useEffect(() => {
     setQuoteVersionTab("current");
   }, [opportunity.id]);
-
-  const allocationRecord = opportunity.allocationId
-    ? allocations.find((a) => a.id === opportunity.allocationId) ?? null
-    : null;
 
   // ── Editable state ────────────────────────────────────────────────────────
 
@@ -591,38 +581,8 @@ export function QuoteAdjustModal({ opportunity, onSubmit, onCancel }: QuoteAdjus
             </p>
           </div>
 
-          {/* Tabs */}
-          <div className="flex-shrink-0 px-6 pt-3 pb-0 border-b border-slate-100">
-            <div className="flex p-0.5 bg-slate-100 rounded-lg mb-3">
-              <button
-                type="button"
-                onClick={() => setDetailTab("quote")}
-                className={`flex-1 py-2 text-[12px] font-semibold rounded-md transition-colors ${
-                  detailTab === "quote"
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                Quote
-              </button>
-              <button
-                type="button"
-                onClick={() => setDetailTab("allocation")}
-                className={`flex-1 py-2 text-[12px] font-semibold rounded-md transition-colors ${
-                  detailTab === "allocation"
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                Allocation
-              </button>
-            </div>
-          </div>
-
           {/* Scrollable body */}
           <div className="flex-1 overflow-y-auto min-h-0 px-6 py-5 space-y-6">
-            {detailTab === "quote" && (
-              <>
             {oldRecord && (
               <div className="flex p-0.5 bg-slate-100 rounded-lg">
                 <button
@@ -790,19 +750,6 @@ export function QuoteAdjustModal({ opportunity, onSubmit, onCancel }: QuoteAdjus
                 ) : null}
               </div>
             </section>
-
-            {/* ── Procurement File ── */}
-            {quoteVersionTab === "current" && procurementAllocation && (
-              <section>
-                <SectionLabel>Procurement File</SectionLabel>
-                <div className="flex items-center gap-2 p-3 rounded-lg border border-slate-200 bg-slate-50 w-fit">
-                  <FileSpreadsheet size={14} className="text-[#002f93] flex-shrink-0" />
-                  <span className="text-[12px] font-semibold text-[#002f93] hover:underline cursor-pointer">
-                    {procurementAllocation.fileName}
-                  </span>
-                </div>
-              </section>
-            )}
 
             {/* ── Quote Items (editable) ── */}
             <section>
@@ -1011,29 +958,13 @@ export function QuoteAdjustModal({ opportunity, onSubmit, onCancel }: QuoteAdjus
             </section>
               </>
             )}
-              </>
-            )}
-
-            {detailTab === "allocation" && (
-              allocationRecord ? (
-                <AllocationRecordDetailContent allocation={allocationRecord} compact={false} />
-              ) : (
-                <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-                  <PackageSearch className="text-slate-300 mb-3" size={40} strokeWidth={1.25} />
-                  <p className="text-[13px] font-semibold text-slate-700">No allocation linked</p>
-                  <p className="text-[12px] text-slate-500 mt-2 max-w-sm leading-relaxed">
-                    There is no allocation record on this opportunity. Details from View Allocation appear here when an allocation is linked (for example from the lead allocation flow).
-                  </p>
-                </div>
-              )
-            )}
           </div>
 
           {/* Footer */}
           <div className="flex-shrink-0 px-6 py-4 border-t border-slate-100 flex justify-center bg-white rounded-b-2xl">
             <button
               onClick={handleSubmit}
-              disabled={!agreed || (detailTab === "quote" && quoteVersionTab === "old")}
+              disabled={!agreed || quoteVersionTab === "old"}
               className="px-10 py-2.5 text-[13px] font-semibold rounded-lg bg-slate-800 text-white hover:bg-slate-900 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Submit Approval

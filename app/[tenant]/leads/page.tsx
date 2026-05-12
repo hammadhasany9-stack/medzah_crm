@@ -8,13 +8,13 @@ import { LeadDetailPanel } from "@/components/leads/LeadDetailPanel";
 import { SourceView } from "@/components/leads/SourceView";
 import { AddSourceModal } from "@/components/leads/AddSourceModal";
 import { INITIAL_SOURCES } from "@/lib/mock-data/sources";
-import { Lead, Opportunity, SourceColumn, AllocationRecord } from "@/lib/types";
+import { Lead, Opportunity, SourceColumn } from "@/lib/types";
 import { useCRMShell } from "@/components/shell/CRMShellContext";
 
 const CURRENT_USER = "Kevin Calamari";
 
 export default function LeadsPage() {
-  const { ownerTab, leads, setLeads, setAllocations, opportunities, setOpportunities } = useCRMShell();
+  const { ownerTab, leads, setLeads, opportunities, setOpportunities } = useCRMShell();
 
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [viewMode, setViewMode]             = useState<LeadsViewMode>("sales");
@@ -75,22 +75,6 @@ export default function LeadsPage() {
     setOpportunities((prev) => prev.map((o) => (o.id === opp.id ? opp : o)));
   }
 
-  function handleAllocationCreated(record: AllocationRecord, leadId: string) {
-    setAllocations((prev) => {
-      const exists = prev.some((a) => a.id === record.id);
-      const next = exists ? prev : [record, ...prev];
-      // Write directly to localStorage immediately so the allocation page
-      // always sees the latest data even before the context effect flushes
-      try {
-        localStorage.setItem("medzah_crm_allocations_v2", JSON.stringify(next));
-      } catch { /* ignore */ }
-      return next;
-    });
-    setLeads((prev) =>
-      prev.map((l) => (l.id === leadId ? { ...l, allocationId: record.id } : l))
-    );
-  }
-
   return (
     <div className="flex flex-col gap-5 p-6 min-h-full">
       <SmartSummaryBar leads={visibleLeads} />
@@ -113,7 +97,6 @@ export default function LeadsPage() {
         }
         onOpportunityCreated={handleOpportunityCreated}
         onOpportunityUpdated={handleOpportunityUpdated}
-        onAllocationCreated={handleAllocationCreated}
       />
       <div className={viewMode === "source" ? "block" : "hidden"} aria-hidden={viewMode !== "source"}>
         <SourceView

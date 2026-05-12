@@ -306,7 +306,6 @@ export default function CreateQuotePage() {
   const [subject,              setSubject]              = useState("");
   const [accountName,          setAccountName]          = useState("");
   const [opportunityOwner,     setOpportunityOwner]     = useState("Katie Allen");
-  const [opportunityName,      setOpportunityName]      = useState("");
   const [quoteStage,           setQuoteStage]           = useState("");
   const [validDate,            setValidDate]            = useState("");
   const [contactName,          setContactName]          = useState("");
@@ -340,6 +339,7 @@ export default function CreateQuotePage() {
 
   // Description
   const [description, setDescription] = useState("");
+  const [termsAndConditions, setTermsAndConditions] = useState("");
 
   // Validation + overlay
   const [errors,    setErrors]    = useState<Record<string, boolean>>({});
@@ -373,13 +373,13 @@ export default function CreateQuotePage() {
     if (!validate()) return;
     commitQuote(followUpDate);
     // Reset form for new quote
-    setSubject(""); setAccountName(""); setOpportunityName(""); setQuoteStage("");
+    setSubject(""); setAccountName(""); setQuoteStage("");
     setValidDate(""); setContactName(""); setShippingMethod(""); setCustomerPO("");
     setOrderSubmittalMethod(""); setOrderNotes(""); setBusinessType(""); setUrgency("");
     setBillingStreet(""); setBillingCity(""); setBillingState(""); setBillingCode(""); setBillingCountry("");
     setShippingStreet(""); setShippingCity(""); setShippingState(""); setShippingCode(""); setShippingCountry("");
     setItems([emptyItem()]); setDiscount(""); setTax(""); setAdjustment("");
-    setDescription(""); setFollowUpDate(addDays(2));
+    setDescription(""); setTermsAndConditions(""); setFollowUpDate(addDays(2));
     setErrors({}); setSubmitted(false);
   }
 
@@ -389,7 +389,7 @@ export default function CreateQuotePage() {
 
     const quoteData: QuoteData = {
       subject, accountName, businessType, urgency,
-      opportunityOwner, opportunityName, quoteStage, validDate,
+      opportunityOwner, quoteStage, validDate,
       contactName, shippingMethod, customerPO, orderSubmittalMethod, orderNotes,
       billingStreet, billingCity, billingState, billingCode, billingCountry,
       shippingStreet, shippingCity, shippingState, shippingCode, shippingCountry,
@@ -410,7 +410,7 @@ export default function CreateQuotePage() {
       overheadAmount: "",
       salesCommissionAmount: "",
       finalQuoteTotal: grandTotal,
-      termsAndConditions: "",
+      termsAndConditions: termsAndConditions.trim(),
       description,
       followUpDate: followUp,
       teamForApproval: teamSelected,
@@ -420,7 +420,6 @@ export default function CreateQuotePage() {
     const opp: Opportunity = {
       id:               `opp-${uid()}`,
       opportunityRef:   `P-${Math.floor(10000 + Math.random() * 90000)}`,
-      opportunityName:  opportunityName || subject || "New Quote",
       accountName,
       businessType,
       closingDate:      validDate || "",
@@ -559,15 +558,6 @@ export default function CreateQuotePage() {
                 <input
                   value={opportunityOwner}
                   onChange={(e) => setOpportunityOwner(e.target.value)}
-                  className={inputCls()}
-                />
-              </div>
-              <div>
-                <Label>Opportunity Name</Label>
-                <input
-                  value={opportunityName}
-                  onChange={(e) => setOpportunityName(e.target.value)}
-                  placeholder="Enter opportunity name"
                   className={inputCls()}
                 />
               </div>
@@ -819,6 +809,23 @@ export default function CreateQuotePage() {
                   <span className="text-[13px] text-slate-700 font-medium">{name}</span>
                 </label>
               ))}
+            </div>
+          </div>
+
+          {/* ── TERMS AND CONDITIONS ── */}
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="px-6 pt-5 pb-2">
+              <SectionDivider>Terms and Conditions</SectionDivider>
+            </div>
+            <div className="px-6 pb-6">
+              <Label>Description</Label>
+              <textarea
+                rows={5}
+                value={termsAndConditions}
+                onChange={(e) => setTermsAndConditions(e.target.value)}
+                placeholder="Enter terms and conditions for this quote (payment, delivery, liability, etc.)"
+                className="w-full px-3 py-2.5 text-[13px] text-slate-800 border border-slate-200 rounded-lg resize-y min-h-[120px] focus:outline-none focus:ring-2 focus:ring-[#002f93]/30 focus:border-[#002f93] placeholder:text-slate-300 leading-relaxed bg-white"
+              />
             </div>
           </div>
 

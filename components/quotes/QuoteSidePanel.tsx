@@ -1,15 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import {
   X, Trash2,
   Calendar, DollarSign, Clock, CheckCircle2,
-  XCircle, FilePlus, FilePenLine, PackageSearch,
+  XCircle, FilePenLine, FilePlus,
 } from "lucide-react";
 import { useTenantRouter } from "@/components/providers/TenantProvider";
 import { Opportunity } from "@/lib/types";
-import { useCRMShell } from "@/components/shell/CRMShellContext";
-import { ViewAllocationModal } from "@/components/leads/ViewAllocationModal";
 
 // ─── Shared badge components ──────────────────────────────────────────────────
 
@@ -17,15 +14,6 @@ function UrgencyBadge({ urgency }: { urgency: string }) {
   return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium text-slate-600 bg-white border border-slate-300 whitespace-nowrap">
       URGENCY: {urgency.toUpperCase()}
-    </span>
-  );
-}
-
-function AllocationBadge() {
-  return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap bg-emerald-100 text-emerald-700 border border-emerald-200">
-      <CheckCircle2 size={10} className="flex-shrink-0" />
-      Allocation Approved
     </span>
   );
 }
@@ -76,25 +64,13 @@ export function QuoteSidePanel({
   onReject,
 }: QuoteSidePanelProps) {
   const router = useTenantRouter();
-  const { allocations } = useCRMShell();
-  const [showAllocModal, setShowAllocModal] = useState(false);
   const isOpen = !!opportunity;
   const quoteData = opportunity?.quoteData;
-
-  const allocationRecord = opportunity?.allocationId
-    ? allocations.find((a) => a.id === opportunity.allocationId) ?? null
-    : null;
-  const hasAllocation = !!(opportunity?.procurementAllocation || allocationRecord);
-
   const isPending  = opportunity?.quoteStatus === "pending";
   const isApproved = opportunity?.quoteStatus === "approved";
   const isRejected = opportunity?.quoteStatus === "rejected";
   const isApprovedWithAdj = !!(isApproved && opportunity?.quoteAdjusted);
   const showQuoteRevised = !!(isPending && opportunity?.quoteRevised);
-
-  useEffect(() => {
-    if (!opportunity) setShowAllocModal(false);
-  }, [opportunity]);
 
   // Format valid date
   const validDisplay = (() => {
@@ -144,12 +120,11 @@ export function QuoteSidePanel({
               <div className="flex items-center gap-1.5 flex-wrap">
                 <UrgencyBadge urgency={quoteData.urgency} />
                 {showQuoteRevised && <QuoteRevisedBadge />}
-                {hasAllocation && <AllocationBadge />}
               </div>
 
               {/* Title */}
               <h2 className="text-base font-bold text-slate-900 leading-snug">
-                {opportunity.opportunityName}
+                {opportunity.accountName}
               </h2>
 
               {/* Avatar + contact */}
@@ -174,17 +149,6 @@ export function QuoteSidePanel({
                 >
                   View Quote
                 </button>
-                {hasAllocation && (
-                  <button
-                    type="button"
-                    onClick={() => allocationRecord && setShowAllocModal(true)}
-                    disabled={!allocationRecord}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-[12px] font-semibold rounded-lg border border-[#002f93]/20 text-[#002f93] hover:bg-[#002f93]/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <PackageSearch size={12} />
-                    View Allocation
-                  </button>
-                )}
               </div>
             </div>
 
@@ -277,7 +241,7 @@ export function QuoteSidePanel({
                   <DetailCell label="Quote Owner"           value={quoteData.opportunityOwner} />
                   <DetailCell label="Quote ID"              value={quoteData.quoteId} />
                   <DetailCell label="Subject"               value={quoteData.subject} />
-                  <DetailCell label="Opportunity Name"      value={quoteData.opportunityName} />
+                  <DetailCell label="Account Name"      value={quoteData.accountName} />
                   <DetailCell label="Quote Stage"           value={quoteData.quoteStage} />
                   <DetailCell label="Contact Name"          value={quoteData.contactName} />
                   <DetailCell label="Account Name"          value={quoteData.accountName} />
@@ -364,13 +328,6 @@ export function QuoteSidePanel({
           </>
         )}
       </aside>
-
-      {showAllocModal && allocationRecord && (
-        <ViewAllocationModal
-          allocation={allocationRecord}
-          onClose={() => setShowAllocModal(false)}
-        />
-      )}
     </>
   );
 }

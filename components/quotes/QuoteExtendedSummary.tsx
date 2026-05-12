@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import type { QuoteData } from "@/lib/types";
 import {
   OVERHEAD_INFRASTRUCTURE_PERCENT,
@@ -75,16 +76,83 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** Key / value row for quote document / modal panels (label + value align in two columns on sm+). */
+function StructuredSpecRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="grid grid-cols-1 gap-1 sm:grid-cols-[minmax(10rem,38%)_1fr] sm:gap-x-6 py-3 px-4 sm:items-start border-b border-slate-100 last:border-b-0">
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 leading-snug">
+        {label}
+      </span>
+      <span className="text-[13px] font-medium text-slate-900 leading-snug">{value}</span>
+    </div>
+  );
+}
+
+function StructuredSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border border-slate-300 bg-white overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-slate-200 bg-gradient-to-r from-slate-100 to-slate-50/90">
+        <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-700">{title}</h3>
+      </div>
+      <div className="bg-white">{children}</div>
+    </section>
+  );
+}
+
 /** Commercial, logistics, and carrier billing captured on proposal / create quote. */
 export function QuoteCommercialLogisticsShippingReadOnly({
   q,
   className = "",
+  variant = "plain",
 }: {
   q: QuoteData;
   className?: string;
+  /** `structured`: bordered panels with section headers (e.g. quote preview). `plain`: compact grid (modals). */
+  variant?: "plain" | "structured";
 }) {
   const showAccount = q.carrierBillingMethod === "Customer shipping account";
   const dash = (v: string | undefined) => (v?.trim() ? v : "—");
+
+  if (variant === "structured") {
+    return (
+      <div className={`flex flex-col gap-4 ${className}`}>
+        <StructuredSection title="Commercial Details">
+          <StructuredSpecRow label="Payment terms" value={dash(q.paymentTerms)} />
+          <StructuredSpecRow label="Expected demand" value={dash(q.expectedDemand)} />
+        </StructuredSection>
+        <StructuredSection title="Logistics & Fulfilment">
+          <StructuredSpecRow label="Delivery locations" value={dash(q.deliveryLocations)} />
+          {q.deliveryLocations === "Multi-site" ? (
+            <StructuredSpecRow
+              label="Number of delivery locations"
+              value={dash(q.deliveryLocationCount)}
+            />
+          ) : null}
+          <StructuredSpecRow
+            label="First order delivery"
+            value={formatQuoteIsoDate(q.firstOrderDeliveryDate)}
+          />
+        </StructuredSection>
+        <StructuredSection title="Shipping Details">
+          <StructuredSpecRow label="Freight responsibility" value={dash(q.freightResponsibility)} />
+          <StructuredSpecRow label="Delivery charges" value={dash(q.deliveryCharges)} />
+          <StructuredSpecRow label="Carrier billing" value={dash(q.carrierBillingMethod)} />
+          {showAccount ? (
+            <StructuredSpecRow
+              label="Customer shipping account #"
+              value={dash(q.customerShippingAccountNumber)}
+            />
+          ) : null}
+        </StructuredSection>
+      </div>
+    );
+  }
 
   return (
     <div className={`space-y-5 ${className}`}>

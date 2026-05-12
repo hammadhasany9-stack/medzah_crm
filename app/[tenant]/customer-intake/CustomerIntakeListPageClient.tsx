@@ -28,6 +28,7 @@ import {
   saveCustomerIntakes,
   deleteCustomerIntake,
   submitCustomerIntakeForApproval,
+  upsertCustomerIntake,
   INTAKE_OWNERS,
 } from "@/lib/mock-data/customer-intake";
 
@@ -215,7 +216,7 @@ function formatModifiedTime(iso: string): string {
 
 export default function CustomerIntakeListPageClient() {
   const { tenant } = useTenant();
-  const [records, setRecords] = useState<CustomerIntakeRecord[]>([]);
+  const [records, setRecords] = useState<CustomerIntakeRecord[]>(() => loadCustomerIntakes());
   const [search, setSearch] = useState("");
   const [ownerFilter, setOwnerFilter] = useState("");
   const [dateRange, setDateRange] = useState<DateRange>({ start: null, end: null });
@@ -225,10 +226,6 @@ export default function CustomerIntakeListPageClient() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-
-  useEffect(() => {
-    setRecords(loadCustomerIntakes());
-  }, []);
 
   useEffect(() => {
     if (records.length > 0) saveCustomerIntakes(records);
@@ -334,6 +331,22 @@ export default function CustomerIntakeListPageClient() {
     if (submitCustomerIntakeForApproval(record.id)) {
       setRecords(loadCustomerIntakes());
     }
+  }
+
+  function handleSendEmailFromList(record: CustomerIntakeRecord) {
+    const email = record.email?.trim();
+    if (!email) {
+      window.alert("Add an email address before sending.");
+      return;
+    }
+    upsertCustomerIntake({
+      ...record,
+      status: "Email Sent",
+      modifiedTime: new Date().toISOString(),
+    });
+    setRecords(loadCustomerIntakes());
+    const subject = `Customer Intake - ${record.customerName}`;
+    window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}`;
   }
 
   return (
@@ -470,7 +483,7 @@ export default function CustomerIntakeListPageClient() {
                 <th className={thCls("customerName")} onClick={() => handleSort("customerName")}>
                   <span className="flex items-center gap-2">
                     <span className="flex items-center gap-1.5">
-                      Customer Name{" "}
+                      Account name{" "}
                       <SortIcon field="customerName" sortField={sortField} sortDir={sortDir} />
                     </span>
                     <span
@@ -617,18 +630,33 @@ export default function CustomerIntakeListPageClient() {
                               Approved
                             </span>
                           )}
-                        {record.status === "Onboarding Complete" &&
-                          !record.intakeApprovalStatus && (
+                        <div className="flex items-center gap-1">
+                          {record.status === "Onboarding Complete" &&
+                            !record.intakeApprovalStatus && (
+                              <button
+                                type="button"
+                                title="Send for Approval"
+                                onClick={() => handleSendForApproval(record)}
+                                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                              >
+                                <SendHorizonal size={14} />
+                              </button>
+                            )}
+                          {record.status === "Onboarding Pending" && (
                             <button
                               type="button"
-                              onClick={() => handleSendForApproval(record)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#002f93] text-white hover:bg-[#002070] active:scale-95 transition-all shadow-sm"
+                              onClick={() => handleSendEmailFromList(record)}
+                              title={
+                                record.email?.trim()
+                                  ? "Send Email"
+                                  : "Add an email address to send"
+                              }
+                              disabled={!record.email?.trim()}
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors disabled:opacity-50 disabled:pointer-events-none"
                             >
-                              <SendHorizonal size={13} />
-                              Send for Approval
+                              <Mail size={14} />
                             </button>
                           )}
-                        <div className="flex items-center gap-1">
                           <TenantLink
                             href={`/customer-intake/${record.id}`}
                             title="View"
@@ -636,20 +664,24 @@ export default function CustomerIntakeListPageClient() {
                           >
                             <Eye size={14} />
                           </TenantLink>
-                          <TenantLink
-                            href={`/customer-intake/${record.id}/edit`}
-                            title="Edit"
-                            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
-                          >
-                            <Pencil size={14} />
-                          </TenantLink>
-                          <button
-                            title="Delete"
-                            onClick={() => setDeleteConfirmId(record.id)}
-                            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          {record.status === "Onboarding Pending" && (
+                            <>
+                              <TenantLink
+                                href={`/customer-intake/${record.id}/edit`}
+                                title="Edit"
+                                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                              >
+                                <Pencil size={14} />
+                              </TenantLink>
+                              <button
+                                title="Delete"
+                                onClick={() => setDeleteConfirmId(record.id)}
+                                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
                     </td>

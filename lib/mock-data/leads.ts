@@ -30,6 +30,8 @@ export const mockLeads: Lead[] = [
     shippingMethod: "Express Freight",
     createdDate: "Apr 2, 2024",
     note: "Client prefers communication via email. Budget confirmed for Phase 2 contingent on Phase 1 approval. Follow up before end of month.",
+    website: "www.lumina.studio",
+    industry: "Healthcare",
 
     activities: [
       {

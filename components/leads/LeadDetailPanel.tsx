@@ -123,7 +123,7 @@ function DetailCell({ label, value }: { label: string; value?: string }) {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const STATUS_OPTIONS: LeadStatus[] = ["New", "Attempted Contact", "Contacted", "Allocation", "Qualified", "Allocation on hold", "Inactive"];
+const STATUS_OPTIONS: LeadStatus[] = ["New", "Attempted Contact", "Contacted", "Qualified", "Inactive"];
 const PRIORITY_OPTIONS: Priority[] = ["Hot", "Warm", "Cold"];
 
 // ─── Panel ────────────────────────────────────────────────────────────────────
@@ -265,7 +265,12 @@ export function LeadDetailPanel({
                   
                  
                   <div className="flex items-center gap-2 mt-1.5">
-                    {lead.callDue ? (
+                    {lead.status === "Qualified" ? (
+                      <span className="flex items-center gap-1.5 text-xs font-medium text-slate-700">
+                        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-violet-500" />
+                        Qualified
+                      </span>
+                    ) : lead.callDue ? (
                       <>
                         <span className={`flex items-center gap-1.5 text-xs font-medium ${lead.callDue.toLowerCase().includes("today") ? "text-red-500" : "text-amber-600"}`}>
                           <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${lead.callDue.toLowerCase().includes("today") ? "bg-red-500" : "bg-amber-500"}`} />
@@ -288,7 +293,11 @@ export function LeadDetailPanel({
                 <InlineSelect
                   label="Lead Status"
                   value={lead.status}
-                  options={STATUS_OPTIONS}
+                  options={
+                    STATUS_OPTIONS.includes(lead.status)
+                      ? STATUS_OPTIONS
+                      : [...STATUS_OPTIONS, lead.status]
+                  }
                   disabled={!onStatusChangeRequest}
                   title={!onStatusChangeRequest ? "Status actions are unavailable." : undefined}
                   onChange={(v) => {

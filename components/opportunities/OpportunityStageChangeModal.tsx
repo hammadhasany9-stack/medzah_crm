@@ -1,13 +1,11 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { X, CheckCircle2, Plus, Trash2, Calendar, Upload, ChevronDown, FileSpreadsheet, DownloadCloud, RefreshCw, CheckCircle, AlertTriangle, FileText, BadgeCheck, ShieldAlert, User, CalendarDays, Hash, PackageSearch } from "lucide-react";
-import { Opportunity, QuoteData, QuoteItem, ProcurementAllocation } from "@/lib/types";
+import { X, CheckCircle2, Plus, Trash2, Calendar, Upload, ChevronDown, FileSpreadsheet, DownloadCloud, RefreshCw, CheckCircle, AlertTriangle } from "lucide-react";
+import { Opportunity, QuoteData, QuoteItem } from "@/lib/types";
 import type { ProductCatalogItem } from "@/lib/mock-data/products";
 import { QuoteProductNamePicker } from "@/components/quotes/QuoteProductNamePicker";
-import { useCRMShell } from "@/components/shell/CRMShellContext";
 import { useTenant } from "@/components/providers/TenantProvider";
-import { AllocationRecordDetailContent } from "@/components/leads/ViewAllocationModal";
 import * as XLSX from "xlsx";
 import {
   getAccountNamesForContactsPicker,
@@ -29,6 +27,14 @@ const DELIVERY_LOCATIONS_OPTIONS = ["Single site", "Multi-site"] as const;
 const FREIGHT_RESPONSIBILITY_OPTIONS = ["Customer pays freight", "We cover freight"] as const;
 const DELIVERY_CHARGES_OPTIONS = ["Applicable", "Waived"] as const;
 const CARRIER_BILLING_OPTIONS = ["Our account (FedEx/UPS)", "Customer shipping account"] as const;
+const PROPOSAL_QUOTE_STAGE_OPTIONS = ["Initial quote", "Revised quote"] as const;
+
+function initialProposalQuoteStage(q: QuoteData | undefined, opp: Opportunity): string {
+  const saved = q?.quoteStage?.trim() ?? "";
+  if ((PROPOSAL_QUOTE_STAGE_OPTIONS as readonly string[]).includes(saved)) return saved;
+  if (opp.quoteRevised) return "Revised quote";
+  return "Initial quote";
+}
 
 function generateId() {
   return Math.random().toString(36).slice(2, 9);
@@ -151,187 +157,6 @@ function SectionHeader({
     <div className="flex items-center gap-2 mb-3">
       <span className="text-[11px] font-bold uppercase tracking-widest text-slate-500">{children}</span>
       <div className="flex-1 h-px bg-slate-200" />
-    </div>
-  );
-}
-
-// ─── Allocation Section ────────────────────────────────────────────────────────
-
-function AllocationBadge({ status }: { status: ProcurementAllocation["status"] }) {
-  if (status === "approved") {
-    return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
-        <BadgeCheck size={12} className="flex-shrink-0" />
-        Approved
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700 border border-amber-200">
-      <ShieldAlert size={12} className="flex-shrink-0" />
-      Partially Approved
-    </span>
-  );
-}
-
-function AllocationSection({ allocation }: { allocation: ProcurementAllocation }) {
-  const [expanded, setExpanded] = useState(true);
-
-  const totalRequested = allocation.items.reduce((s, i) => s + i.requestedQty, 0);
-  const totalApproved  = allocation.items.reduce((s, i) => s + i.approvedQty,  0);
-  const fulfilPct = totalRequested > 0 ? Math.round((totalApproved / totalRequested) * 100) : 0;
-
-  return (
-    <div className="rounded-xl border border-slate-200 overflow-hidden">
-      {/* ── Coloured top strip ── */}
-      <div className={`h-1 w-full ${allocation.status === "approved" ? "bg-emerald-400" : "bg-amber-400"}`} />
-
-      {/* ── Header row ── */}
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-white hover:bg-slate-50 transition-colors group"
-      >
-        <div className="flex items-center gap-3">
-          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0
-            ${allocation.status === "approved" ? "bg-emerald-100" : "bg-amber-100"}`}>
-            <FileText size={15} className={allocation.status === "approved" ? "text-emerald-600" : "text-amber-600"} />
-          </div>
-          <div className="text-left">
-            <p className="text-[13px] font-bold text-slate-800 leading-snug">Allocation</p>
-            <p className="text-[11px] text-slate-500 mt-0.5">{allocation.fileName}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 flex-shrink-0">
-          <AllocationBadge status={allocation.status} />
-          <ChevronDown
-            size={14}
-            className={`text-slate-400 transition-transform duration-200 ${expanded ? "rotate-180" : "rotate-0"}`}
-          />
-        </div>
-      </button>
-
-      {/* ── Expanded body ── */}
-      {expanded && (
-        <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-4 space-y-4">
-
-          {/* Meta row */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="flex items-center gap-2">
-              <Hash size={12} className="text-slate-400 flex-shrink-0" />
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Ref Number</p>
-                <p className="text-[12px] font-semibold text-slate-700">{allocation.refNumber}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <CalendarDays size={12} className="text-slate-400 flex-shrink-0" />
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Approved Date</p>
-                <p className="text-[12px] font-semibold text-slate-700">{allocation.approvedDate}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <User size={12} className="text-slate-400 flex-shrink-0" />
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Approved By</p>
-                <p className="text-[12px] font-semibold text-slate-700">{allocation.approvedBy}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Progress bar (only meaningful for partially approved) */}
-          {allocation.status === "partially_approved" && (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="text-slate-500 font-medium">Allocation coverage</span>
-                <span className="font-bold text-slate-700">{totalApproved} / {totalRequested} units ({fulfilPct}%)</span>
-              </div>
-              <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-amber-400 rounded-full transition-all"
-                  style={{ width: `${fulfilPct}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Items table */}
-          <div className="border border-slate-200 rounded-lg overflow-hidden">
-            <div className="grid grid-cols-[1fr_90px_90px_80px] bg-slate-700 text-white">
-              <div className="px-3 py-2 text-[11px] font-bold">Product</div>
-              <div className="px-3 py-2 text-[11px] font-bold text-center">Requested</div>
-              <div className="px-3 py-2 text-[11px] font-bold text-center">Approved</div>
-              <div className="px-3 py-2 text-[11px] font-bold text-center">Status</div>
-            </div>
-            {allocation.items.map((item, i) => {
-              const isFull    = item.approvedQty >= item.requestedQty;
-              const isPartial = item.approvedQty > 0 && item.approvedQty < item.requestedQty;
-              const isNone    = item.approvedQty === 0;
-              return (
-                <div
-                  key={i}
-                  className={`grid grid-cols-[1fr_90px_90px_80px] items-center border-t border-slate-100
-                    ${i % 2 === 0 ? "bg-white" : "bg-slate-50/60"}`}
-                >
-                  <div className="px-3 py-2 text-[12px] text-slate-800 font-medium">{item.productName}</div>
-                  <div className="px-3 py-2 text-[12px] text-slate-600 text-center">{item.requestedQty}</div>
-                  <div className="px-3 py-2 text-[12px] font-semibold text-center">
-                    <span className={isFull ? "text-emerald-600" : isPartial ? "text-amber-600" : "text-red-500"}>
-                      {item.approvedQty}
-                    </span>
-                  </div>
-                  <div className="px-3 py-2 flex justify-center">
-                    {isFull && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-700">
-                        <CheckCircle size={9} /> Full
-                      </span>
-                    )}
-                    {isPartial && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-700">
-                        <ShieldAlert size={9} /> Partial
-                      </span>
-                    )}
-                    {isNone && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-red-100 text-red-600">
-                        <X size={9} /> Pending
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Notes */}
-          {allocation.notes && (
-            <div className="bg-white border border-slate-200 rounded-lg px-3 py-2.5">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Allocation Notes</p>
-              <p className="text-[12px] text-slate-700 leading-relaxed">{allocation.notes}</p>
-            </div>
-          )}
-
-          {/* File download button */}
-          <div className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2.5">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0">
-                <FileText size={14} className="text-red-500" />
-              </div>
-              <div>
-                <p className="text-[12px] font-semibold text-slate-800">{allocation.fileName}</p>
-                <p className="text-[11px] text-slate-400">{allocation.fileSize}</p>
-              </div>
-            </div>
-            <button
-              type="button"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-[#002f93] border border-[#002f93]/20 hover:bg-[#002f93]/5 transition-colors"
-            >
-              <DownloadCloud size={13} />
-              Download
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -841,16 +666,8 @@ export interface OpportunityStageChangeModalProps {
   onCancel: () => void;
 }
 
-type ProposalModalDetailTab = "quote" | "allocation";
-
 export function OpportunityStageChangeModal({ opportunity, onSave, onCancel }: OpportunityStageChangeModalProps) {
   const { tenant } = useTenant();
-  const { allocations } = useCRMShell();
-  const allocationRecord = opportunity.allocationId
-    ? allocations.find((a) => a.id === opportunity.allocationId) ?? null
-    : null;
-
-  const [detailTab, setDetailTab] = useState<ProposalModalDetailTab>("quote");
 
   // Pre-fill from existing quoteData when available (e.g. recreating / revising a quote)
   const q = opportunity.quoteData;
@@ -863,8 +680,9 @@ export function OpportunityStageChangeModal({ opportunity, onSave, onCancel }: O
 
   // Additional info
   const [opportunityOwner, setOpportunityOwner] = useState(q?.opportunityOwner ?? opportunity.assignedTo ?? "");
-  const [opportunityName, setOpportunityName] = useState(q?.opportunityName ?? opportunity.opportunityName ?? "");
-  const [quoteStage, setQuoteStage] = useState(q?.quoteStage ?? "");
+  const [quoteStage, setQuoteStage] = useState(() =>
+    initialProposalQuoteStage(q, opportunity)
+  );
   const [validDate, setValidDate] = useState(q?.validDate ?? "");
   const [contactName, setContactName] = useState(q?.contactName ?? opportunity.contactName ?? "");
   const [shippingMethod, setShippingMethod] = useState(q?.shippingMethod ?? "");
@@ -941,6 +759,7 @@ export function OpportunityStageChangeModal({ opportunity, onSave, onCancel }: O
 
   // Footer
   const [description, setDescription] = useState(q?.description ?? "");
+  const [termsAndConditions, setTermsAndConditions] = useState(q?.termsAndConditions ?? "");
   const [followUpDate, setFollowUpDate] = useState(q?.followUpDate ?? "");
 
   const [additionalInfoOpen, setAdditionalInfoOpen] = useState(false);
@@ -989,6 +808,7 @@ export function OpportunityStageChangeModal({ opportunity, onSave, onCancel }: O
     if (!accountName.trim()) errs["accountName"] = true;
     if (!businessType.trim()) errs["businessType"] = true;
     if (!urgency.trim()) errs["urgency"] = true;
+    if (!quoteStage.trim()) errs["quoteStage"] = true;
 
     // At least one item row must have productName and quantity
     let hasValidItem = false;
@@ -1032,7 +852,7 @@ export function OpportunityStageChangeModal({ opportunity, onSave, onCancel }: O
 
     const quoteData: QuoteData = {
       subject, accountName, businessType, urgency,
-      opportunityOwner, opportunityName, quoteStage, validDate,
+      opportunityOwner, quoteStage, validDate,
       contactName, shippingMethod, customerPO, orderSubmittalMethod, orderNotes,
       billingStreet, billingCity, billingState, billingCode, billingCountry,
       shippingStreet, shippingCity, shippingState, shippingCode, shippingCountry,
@@ -1060,7 +880,7 @@ export function OpportunityStageChangeModal({ opportunity, onSave, onCancel }: O
       overheadAmount: feeCalc.overheadAmount,
       salesCommissionAmount: feeCalc.salesCommissionAmount,
       finalQuoteTotal: feeCalc.finalQuoteTotal,
-      termsAndConditions: "", description, followUpDate,
+      termsAndConditions: termsAndConditions.trim(), description, followUpDate,
       teamForApproval: TEAM_MEMBERS,
     };
     onSave(quoteData);
@@ -1100,39 +920,8 @@ export function OpportunityStageChangeModal({ opportunity, onSave, onCancel }: O
             </button>
           </div>
 
-          {/* Quote / Allocation tabs */}
-          <div className="flex-shrink-0 px-5 pt-3 pb-0 border-b border-slate-100">
-            <div className="flex p-0.5 bg-slate-100 rounded-lg mb-3">
-              <button
-                type="button"
-                onClick={() => setDetailTab("quote")}
-                className={`flex-1 py-2 text-[12px] font-semibold rounded-md transition-colors ${
-                  detailTab === "quote"
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                Quote
-              </button>
-              <button
-                type="button"
-                onClick={() => setDetailTab("allocation")}
-                className={`flex-1 py-2 text-[12px] font-semibold rounded-md transition-colors ${
-                  detailTab === "allocation"
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                Allocation
-              </button>
-            </div>
-          </div>
-
           {/* ── Scrollable Body ── */}
           <div className="overflow-y-auto flex-1 min-h-0 px-5 py-4 space-y-5">
-
-            {detailTab === "quote" && (
-              <>
             {hasErrors && (
               <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 text-[12px] text-red-600 font-medium">
                 Please fill in all required fields and add at least one product row.
@@ -1142,7 +931,7 @@ export function OpportunityStageChangeModal({ opportunity, onSave, onCancel }: O
             {/* BASIC INFORMATION */}
             <div>
               <SectionHeader>Basic Information</SectionHeader>
-              <div className="grid grid-cols-4 gap-x-3 gap-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-x-3 gap-y-3">
                 <div>
                   <Label required>Subject</Label>
                   <Input value={subject} onChange={setSubject} placeholder="Enter subject" required error={submitted && errors["subject"]} />
@@ -1175,6 +964,16 @@ export function OpportunityStageChangeModal({ opportunity, onSave, onCancel }: O
                     options={["High", "Medium", "Low"]}
                     placeholder="Select Urgency"
                     error={submitted && errors["urgency"]}
+                  />
+                </div>
+                <div>
+                  <Label required>Quote Stage</Label>
+                  <Select
+                    value={quoteStage}
+                    onChange={setQuoteStage}
+                    options={[...PROPOSAL_QUOTE_STAGE_OPTIONS]}
+                    placeholder="Select quote stage"
+                    error={submitted && !!errors["quoteStage"]}
                   />
                 </div>
               </div>
@@ -1299,11 +1098,6 @@ export function OpportunityStageChangeModal({ opportunity, onSave, onCancel }: O
               </div>
             </div>
 
-            {/* ALLOCATION — shown only when procurement data is available */}
-            {opportunity.procurementAllocation && (
-              <AllocationSection allocation={opportunity.procurementAllocation} />
-            )}
-
             {/* ADDITIONAL INFORMATION — collapsible */}
             <div>
               <SectionHeader
@@ -1329,15 +1123,6 @@ export function OpportunityStageChangeModal({ opportunity, onSave, onCancel }: O
                           onChange={setOpportunityOwner}
                           options={["Katie Allen", "Kevin Calamari", "Sarah Chen", "James Mitchell"]}
                           placeholder="Select Owner"
-                        />
-                      </div>
-                      <div>
-                        <Label>Quote Stage</Label>
-                        <Select
-                          value={quoteStage}
-                          onChange={setQuoteStage}
-                          options={["Draft", "Needs Analysis", "Value Proposition", "Delivered", "On Hold", "Denied"]}
-                          placeholder="Select Quote stage"
                         />
                       </div>
                       <div>
@@ -1368,10 +1153,6 @@ export function OpportunityStageChangeModal({ opportunity, onSave, onCancel }: O
 
                     {/* Right column */}
                     <div className="space-y-3">
-                      <div>
-                        <Label>Opportunity Name</Label>
-                        <Input value={opportunityName} onChange={setOpportunityName} placeholder="Enter opportunity name" />
-                      </div>
                       <div>
                         <Label>Valid Date</Label>
                         <div className="relative">
@@ -1585,22 +1366,22 @@ export function OpportunityStageChangeModal({ opportunity, onSave, onCancel }: O
                 </label>
               </div>
             </div>
-              </>
-            )}
 
-            {detailTab === "allocation" && (
-              allocationRecord ? (
-                <AllocationRecordDetailContent allocation={allocationRecord} compact={false} />
-              ) : (
-                <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-                  <PackageSearch className="text-slate-300 mb-3" size={40} strokeWidth={1.25} />
-                  <p className="text-[13px] font-semibold text-slate-700">No allocation linked</p>
-                  <p className="text-[12px] text-slate-500 mt-2 max-w-md leading-relaxed">
-                    There is no allocation record on this opportunity. The same details shown in View Allocation appear here when an allocation is linked (for example from the lead allocation flow).
-                  </p>
-                </div>
-              )
-            )}
+            {/* Terms and Conditions — bottom of form */}
+            <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+              <div className="px-4 py-2.5 border-b border-slate-200 bg-slate-50/90">
+                <span className="text-[11px] font-bold uppercase tracking-widest text-slate-700">Terms and Conditions</span>
+              </div>
+              <div className="p-4">
+                <Label>Description</Label>
+                <TextArea
+                  value={termsAndConditions}
+                  onChange={setTermsAndConditions}
+                  placeholder="Enter terms and conditions for this quote (payment, delivery, liability, etc.)"
+                  rows={5}
+                />
+              </div>
+            </div>
           </div>
 
           {/* ── Footer ── */}

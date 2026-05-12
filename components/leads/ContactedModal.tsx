@@ -17,8 +17,6 @@ interface ContactedModalProps {
   leadName: string;
   onSave: (result: ContactedModalResult) => void;
   onCancel: () => void;
-  /** Same allocation flow as dragging a lead to the Allocation column */
-  onStartAllocation: () => void;
 }
 
 // ─── Reason chips ─────────────────────────────────────────────────────────────
@@ -129,7 +127,7 @@ const targetStatusMap: Record<NonNullable<Outcome>, LeadStatus> = {
 const FOLLOW_UP_REASONS = ["Budget", "Busy", "Internal Delay", "Other"];
 const INACTIVE_REASONS  = ["Budget", "Busy", "Internal issue", "Other"];
 
-export function ContactedModal({ onSave, onCancel, onStartAllocation }: ContactedModalProps) {
+export function ContactedModal({ onSave, onCancel }: ContactedModalProps) {
   const [outcome, setOutcome]   = useState<Outcome>(null);
   const [dueDate, setDueDate]   = useState(addDays(2));
   const [reason, setReason]         = useState<string | null>(null);
@@ -177,11 +175,6 @@ export function ContactedModal({ onSave, onCancel, onStartAllocation }: Contacte
           <div className="flex flex-col items-center gap-3 w-full">
             <p className="text-sm font-bold text-slate-900">What&apos;s the outcome?</p>
             <div className="flex items-center gap-3 flex-wrap justify-center">
-              <OutcomeButton
-                label="Start Allocation"
-                active={false}
-                onClick={onStartAllocation}
-              />
               <OutcomeButton
                 label="Follow Up Later"
                 active={outcome === "nurture"}

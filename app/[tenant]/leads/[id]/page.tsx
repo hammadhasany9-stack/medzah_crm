@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { mockLeads } from "@/lib/mock-data/leads";
 import { Lead, Priority, LeadStatus, ActivityEvent } from "@/lib/types";
+import { LeadEngagementTabs, type LeadEngagementPanel } from "@/components/leads/lead-detail/LeadEngagementTabs";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -89,14 +90,19 @@ const ALL_STAGES: { status: LeadStatus; short: string }[] = [
   { status: "New",                 short: "New" },
   { status: "Attempted Contact",   short: "Attempted" },
   { status: "Contacted",           short: "Contacted" },
-  { status: "Allocation",          short: "Allocation" },
   { status: "Qualified",           short: "Qualified" },
-  { status: "Allocation on hold",  short: "On Hold" },
   { status: "Inactive",            short: "Inactive" },
 ];
 
+const LEGACY_STAGE_MAP: Partial<Record<LeadStatus, LeadStatus>> = {
+  Allocation: "Contacted",
+  "Allocation on hold": "Contacted",
+};
+
 function LeadStageStepper({ status }: { status: LeadStatus }) {
-  const activeIdx = ALL_STAGES.findIndex((s) => s.status === status);
+  const mapped = LEGACY_STAGE_MAP[status] ?? status;
+  const activeIdxRaw = ALL_STAGES.findIndex((s) => s.status === mapped);
+  const activeIdx = activeIdxRaw >= 0 ? activeIdxRaw : 0;
 
   return (
     <div className="flex items-start w-full">
@@ -148,8 +154,11 @@ function LeadStageStepper({ status }: { status: LeadStatus }) {
 // ─── Select option lists ──────────────────────────────────────────────────────
 
 const STATUS_OPTIONS: LeadStatus[] = [
-  "New", "Attempted Contact", "Contacted",
-  "Allocation", "Qualified", "Allocation on hold", "Inactive",
+  "New",
+  "Attempted Contact",
+  "Contacted",
+  "Qualified",
+  "Inactive",
 ];
 const PRIORITY_OPTIONS: Priority[] = ["Hot", "Warm", "Cold"];
 
@@ -193,18 +202,8 @@ function Cell({ label, value }: { label: string; value?: string }) {
   );
 }
 
-// ─── Stat cell ────────────────────────────────────────────────────────────────
 
-function StatCell({ label, value }: { label: string; value?: string }) {
-  return (
-    <div className="flex flex-col items-start gap-0.5">
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">{label}</p>
-      <p className="text-sm font-semibold text-slate-800">{value ?? "—"}</p>
-    </div>
-  );
-}
 
-// ─── Activity dot ─────────────────────────────────────────────────────────────
 
 const activityDotColor: Record<string, string> = {
   email:   "bg-[#002f93]",
@@ -229,20 +228,39 @@ function TimelineEvent({ event, isLast }: { event: ActivityEvent; isLast: boolea
   );
 }
 
+// ─── Tabs ─────────────────────────────────────────────────────────────────────
+
+type LeadDetailTab = "overview" | "timeline" | LeadEngagementPanel;
+
+function isLeadEngagementPanel(tab: LeadDetailTab): tab is LeadEngagementPanel {
+  return tab !== "overview" && tab !== "timeline";
+}
+
+const LEAD_DETAIL_TABS: { id: LeadDetailTab; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "timeline", label: "Timeline" },
+  { id: "emails", label: "Emails" },
+  { id: "calls", label: "Calls" },
+  { id: "comments", label: "Comments" },
+  { id: "tasks", label: "Tasks" },
+  { id: "notes", label: "Notes" },
+  { id: "attachments", label: "Attachments" },
+];
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function LeadDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const router = useTenantRouter();
-  const [activeTab, setActiveTab] = useState<"overview" | "timeline">("overview");
-  const [status,            setStatus]            = useState<string>("");
-  const [priority,          setPriority]          = useState<string>("");
+  const [activeTab, setActiveTab] = useState<LeadDetailTab>("overview");
+  const [status, setStatus] = useState<string>("");
+  const [priority, setPriority] = useState<string>("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const lead: Lead | undefined = mockLeads.find((l) => l.id === id);
 
-  const currentStatus   = (status   || lead?.status)   as LeadStatus;
+  const currentStatus = (status || lead?.status || "New") as LeadStatus;
   const currentPriority = (priority || lead?.priority) as Priority;
 
   if (!lead) {
@@ -292,7 +310,11 @@ export default function LeadDetailPage() {
 
         {/* Right: actions */}
         <div className="flex items-center gap-4 flex-shrink-0">
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-[#002f93] text-white hover:bg-[#001f6b] transition-colors">
+          <button
+            type="button"
+            onClick={() => setActiveTab("emails")}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-[#002f93] text-white hover:bg-[#001f6b] transition-colors"
+          >
             <Mail size={16} />
             Send Email
           </button>
@@ -359,18 +381,24 @@ export default function LeadDetailPage() {
 
           {/* ── Card 1: Lead identity ── */}
           <div className="bg-white rounded-xl border border-slate-200 px-5 py-4">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-base flex-shrink-0">
-                {initials}
-              </div>
-              <div className="flex-1 min-w-0 space-y-1">
-                <h1 className="text-lg font-bold text-slate-900 leading-tight">{lead.contactName}</h1>
-                <p className="text-sm text-slate-500">{lead.companyName}</p>
-                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                  <SourceBadge source={lead.leadSource} />
-                  <PriorityBadge priority={currentPriority} />
-                  <StatusBadge status={currentStatus} />
-                  {lead.callDue ? (
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+              <div className="flex items-start gap-4 min-w-0 flex-1">
+                <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-base flex-shrink-0">
+                  {initials}
+                </div>
+                <div className="flex-1 min-w-0 space-y-1">
+                  <h1 className="text-lg font-bold text-slate-900 leading-tight">{lead.contactName}</h1>
+                  <p className="text-sm text-slate-500">{lead.companyName}</p>
+                  <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                    <SourceBadge source={lead.leadSource} />
+                    <PriorityBadge priority={currentPriority} />
+                    <StatusBadge status={currentStatus} />
+                  {currentStatus === "Qualified" ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border bg-violet-50 text-violet-800 border-violet-100">
+                      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-violet-500" />
+                      Qualified
+                    </span>
+                  ) : lead.callDue ? (
                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${lead.callDue.toLowerCase().includes("today") ? "bg-red-50 text-red-600 border-red-100" : "bg-amber-50 text-amber-600 border-amber-100"}`}>
                       <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${lead.callDue.toLowerCase().includes("today") ? "bg-red-500" : "bg-amber-500"}`} />
                       {lead.callDue}
@@ -381,6 +409,39 @@ export default function LeadDetailPage() {
                       No action scheduled
                     </span>
                   )}
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-end gap-3 w-full sm:w-auto sm:flex-shrink-0 sm:justify-end border-t border-slate-100 pt-4 sm:border-t-0 sm:pt-0">
+                <div className="flex flex-col gap-1 min-w-[180px] flex-1 sm:flex-initial">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Lead Status</span>
+                  <div className="relative">
+                    <select
+                      value={currentStatus}
+                      onChange={(e) => setStatus(e.target.value)}
+                      className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-lg pl-2.5 pr-7 py-2 text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-[#002f93] focus:ring-offset-1 cursor-pointer"
+                    >
+                      {(STATUS_OPTIONS.includes(currentStatus) ? STATUS_OPTIONS : [...STATUS_OPTIONS, currentStatus]).map((o) => (
+                        <option key={o} value={o}>{o}</option>
+                      ))}
+                    </select>
+                    <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]">▾</span>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1 min-w-[120px] flex-1 sm:flex-initial">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Lead Priority</span>
+                  <div className="relative">
+                    <select
+                      value={currentPriority}
+                      onChange={(e) => setPriority(e.target.value)}
+                      className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-lg pl-2.5 pr-7 py-2 text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-[#002f93] focus:ring-offset-1 cursor-pointer"
+                    >
+                      {PRIORITY_OPTIONS.map((o) => (
+                        <option key={o} value={o}>{o}</option>
+                      ))}
+                    </select>
+                    <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]">▾</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -395,49 +456,23 @@ export default function LeadDetailPage() {
             <LeadStageStepper status={currentStatus} />
           </div>
 
-          {/* ── Card 3: Tab bar + dropdowns ── */}
+          {/* ── Card 3: Tab bar ── */}
           <div className="bg-white rounded-xl border border-slate-200 px-5">
-            <div className="flex items-center justify-between gap-3">
-              {/* Tabs */}
-              <div className="flex gap-1">
-                {(["overview", "timeline"] as const).map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`px-4 py-3 text-sm font-semibold capitalize border-b-2 transition-colors ${
-                      activeTab === tab
-                        ? "border-[#002f93] text-[#002f93]"
-                        : "border-transparent text-slate-500 hover:text-slate-700"
-                    }`}
-                  >
-                    {tab}
-                  </button>
-                ))}
-              </div>
-
-              {/* Compact Status + Priority selects */}
-              <div className="flex items-center gap-2">
-                <div className="relative">
-                  <select
-                    value={currentStatus}
-                    onChange={(e) => setStatus(e.target.value)}
-                    className="appearance-none bg-slate-50 border border-slate-200 rounded-lg pl-2.5 pr-6 py-1.5 text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-[#002f93] focus:ring-offset-1 cursor-pointer"
-                  >
-                    {STATUS_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                  <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]">▾</span>
-                </div>
-                <div className="relative">
-                  <select
-                    value={currentPriority}
-                    onChange={(e) => setPriority(e.target.value)}
-                    className="appearance-none bg-slate-50 border border-slate-200 rounded-lg pl-2.5 pr-6 py-1.5 text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-[#002f93] focus:ring-offset-1 cursor-pointer"
-                  >
-                    {PRIORITY_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                  <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]">▾</span>
-                </div>
-              </div>
+            <div className="flex gap-1 flex-nowrap overflow-x-auto min-w-0 pb-px -mx-1 px-1">
+              {LEAD_DETAIL_TABS.map(({ id, label }) => (
+                <button
+                  type="button"
+                  key={id}
+                  onClick={() => setActiveTab(id)}
+                  className={`px-3 sm:px-4 py-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
+                    activeTab === id
+                      ? "border-[#002f93] text-[#002f93]"
+                      : "border-transparent text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -483,7 +518,12 @@ export default function LeadDetailPage() {
                     <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-0.5">
                       Next Action
                     </p>
-                    {lead.callDue ? (
+                    {currentStatus === "Qualified" ? (
+                      <span className="flex items-center gap-1.5 text-sm font-medium text-violet-800">
+                        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-violet-500" />
+                        Qualified
+                      </span>
+                    ) : lead.callDue ? (
                       <span className={`flex items-center gap-1.5 text-sm font-medium ${lead.callDue.toLowerCase().includes("today") ? "text-red-600" : "text-amber-600"}`}>
                         <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${lead.callDue.toLowerCase().includes("today") ? "bg-red-500" : "bg-amber-500"}`} />
                         {lead.callDue}
@@ -520,94 +560,11 @@ export default function LeadDetailPage() {
                 </p>
               </Section>
 
-              {/* Visit Summary */}
-              <Section title="Visit Summary">
-                <div className="grid grid-cols-3 gap-x-6 gap-y-4">
-                  <StatCell label="Most Recent Visit" />
-                  <StatCell label="First Page Visited" />
-                  <StatCell label="Average Time Spent" />
-                  <StatCell label="Referrer" />
-                  <StatCell label="No of Visits" />
-                  <StatCell label="Visitor Score" />
-                  <StatCell label="Days Visited" />
-                </div>
-              </Section>
-
-              {/* Notes */}
-              <Section title="Notes" actionLabel="Add a note">
-                <p className="text-sm text-slate-400 italic">No notes yet.</p>
-              </Section>
-
-              {/* Connected Records */}
-              <Section title="Connected Records" actionLabel="Add new">
-                <p className="text-sm text-slate-400 italic">No connected records.</p>
-              </Section>
-
-              {/* Attachments */}
-              <Section title="Attachments" actionLabel="Add new">
-                <p className="text-sm text-slate-400 italic">No attachments.</p>
-              </Section>
-
-              {/* Products */}
-              <Section title="Products" actionLabel="Add new">
-                {lead.procurementProducts && lead.procurementProducts.length > 0 ? (
-                  <div className="divide-y divide-slate-100">
-                    {lead.procurementProducts.map((p) => (
-                      <div key={p.id} className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0">
-                        <span className="text-sm font-medium text-slate-800">{p.name}</span>
-                        <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
-                          Qty: {p.quantity}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-slate-400 italic">No products added.</p>
-                )}
-              </Section>
-
-              {/* Open Activities */}
-              <Section title="Open Activities" actionLabel="Add new">
-                {lead.callDue ? (
-                  <div className="flex items-center gap-3 py-1">
-                    <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
-                    <span className="text-sm font-medium text-slate-800">{lead.callDue}</span>
-                  </div>
-                ) : (
-                  <p className="text-sm text-slate-400 italic">No open activities.</p>
-                )}
-              </Section>
-
-              {/* Planned Activities */}
-              <Section title="Planned Activities" actionLabel="Add new">
-                <p className="text-sm text-slate-400 italic">No planned activities.</p>
-              </Section>
-
-              {/* Notes / Meetings */}
-              <Section title="Notes / Meetings" actionLabel="Add new">
-                <p className="text-sm text-slate-400 italic">No meetings scheduled.</p>
-              </Section>
-
-              {/* Emails */}
-              <Section title="Emails" actionLabel="Compose Email">
-                <p className="text-sm text-slate-400 italic">No emails logged.</p>
-              </Section>
-
-              {/* Campaigns */}
-              <Section title="Campaigns" actionLabel="Add Campaigns">
-                <p className="text-sm text-slate-400 italic">No campaigns linked.</p>
-              </Section>
-
-              {/* Social */}
-              <Section title="Social">
-                <p className="text-sm text-slate-400 italic">No social profiles linked.</p>
-              </Section>
-
               {/* Opportunity Data (shown if qualified) */}
               {lead.opportunityData && (
                 <Section title="Opportunity Details">
                   <div className="grid grid-cols-2 gap-x-6 gap-y-5">
-                    <Cell label="Opportunity Name"  value={lead.opportunityData.opportunityName} />
+                    <Cell label="Account"  value={lead.opportunityData.accountName} />
                     <Cell label="Account Name"       value={lead.opportunityData.accountName} />
                     <Cell label="Business Type"      value={lead.opportunityData.businessType} />
                     <Cell label="Pipeline"           value={lead.opportunityData.pipeline} />
@@ -626,27 +583,6 @@ export default function LeadDetailPage() {
                 </Section>
               )}
 
-              {/* Allocation Details (shown if in allocation) */}
-              {lead.procurementStatus && (
-                <Section title="Allocation">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
-                        lead.procurementStatus === "approved"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-amber-100 text-amber-700"
-                      }`}
-                    >
-                      {lead.procurementStatus === "approved" ? "Approved" : "Checking"}
-                    </span>
-                    <span className="text-sm text-slate-500">
-                      {lead.procurementStatus === "approved"
-                        ? "Allocation has approved this lead."
-                        : "Allocation check is in progress."}
-                    </span>
-                  </div>
-                </Section>
-              )}
             </div>
           )}
 
@@ -668,6 +604,8 @@ export default function LeadDetailPage() {
               )}
             </Section>
           )}
+
+          {isLeadEngagementPanel(activeTab) && <LeadEngagementTabs lead={lead} panel={activeTab} />}
 
           {/* Bottom spacer */}
           <div className="h-4" />

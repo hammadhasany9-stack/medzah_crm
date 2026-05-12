@@ -1,17 +1,12 @@
 "use client";
 
-import { useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   PhoneCall, Globe, UserPlus, Building2,
   Link2, Megaphone, Users, Star, Zap,
-  HelpCircle, Loader2, ShieldCheck, ChevronDown, Package, Eye, CircleDot,
+  HelpCircle,
 } from "lucide-react";
-import { Lead, LeadStatus, ProcurementStatus, Priority, AllocationRecord } from "@/lib/types";
-import { useCRMShell } from "@/components/shell/CRMShellContext";
-import { canDownloadAllocationExport } from "@/lib/export-allocation-xlsx";
-import { DownloadAllocationButton } from "@/components/allocations/DownloadAllocationButton";
-import { ViewAllocationModal } from "./ViewAllocationModal";
+import { Lead, LeadStatus, Priority } from "@/lib/types";
 
 // ─── Source badge ─────────────────────────────────────────────────────────────
 
@@ -97,102 +92,12 @@ function CallDue({ label }: { label: string }) {
   );
 }
 
-// ─── Procurement status badge ─────────────────────────────────────────────────
-
-const procurementBadgeStyles: Record<ProcurementStatus, { icon: LucideIcon; label: string; className: string }> = {
-  checking: {
-    icon:      Loader2,
-    label:     "Checking",
-    className: "bg-amber-50 text-amber-700 border border-amber-200",
-  },
-  approved: {
-    icon:      ShieldCheck,
-    label:     "Approved",
-    className: "bg-emerald-50 text-emerald-700 border border-emerald-200",
-  },
-};
-
-function ProcurementBadge({ status }: { status: ProcurementStatus }) {
-  const { icon: Icon, label, className } = procurementBadgeStyles[status];
+function QualifiedAction() {
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap ${className}`}>
-      <Icon size={11} className={status === "checking" ? "animate-spin" : ""} />
-      {label}
+    <span className="inline-flex items-center gap-1.5 text-[12px] font-medium whitespace-nowrap flex-shrink-0 text-slate-700">
+      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-violet-500" />
+      Qualified
     </span>
-  );
-}
-
-/** Shown on Allocation / Allocation on hold column cards when the allocation record has a verdict. */
-function AllocationRecordVerdictBadge({ record }: { record: AllocationRecord }) {
-  if (record.status === "Approved") {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap bg-emerald-100 text-emerald-800 border border-emerald-200">
-        <ShieldCheck size={11} className="flex-shrink-0" />
-        Approved
-      </span>
-    );
-  }
-  if (record.status === "Partially Approved") {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap bg-amber-100 text-amber-800 border border-amber-200">
-        <CircleDot size={11} className="flex-shrink-0" />
-        Partially approved
-      </span>
-    );
-  }
-  return null;
-}
-
-// ─── View products section ────────────────────────────────────────────────────
-
-function ViewProductsSection({ lead }: { lead: Lead }) {
-  const [open, setOpen] = useState(false);
-  const products = lead.procurementProducts ?? [];
-  if (products.length === 0) return null;
-
-  return (
-    <>
-      <div className="h-px bg-slate-100 mx-4" />
-      <div className="px-4 py-2">
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
-          className="w-full flex items-center justify-between text-[12px] font-semibold text-[#002f93] hover:text-[#001f6b] transition-colors group"
-        >
-          <span className="flex items-center gap-1.5">
-            <Package size={12} />
-            View Products ({products.length})
-          </span>
-          <ChevronDown
-            size={13}
-            className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-          />
-        </button>
-
-        {open && (
-          <div className="mt-2 rounded-lg border border-slate-100 bg-slate-50 overflow-hidden">
-            <div className="grid grid-cols-[1fr_auto] gap-x-3 px-3 py-1.5 border-b border-slate-100">
-              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Product</p>
-              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-right">Qty</p>
-            </div>
-            {products.map((p, i) => (
-              <div
-                key={p.id}
-                className={`grid grid-cols-[1fr_auto] gap-x-3 px-3 py-1.5 ${i < products.length - 1 ? "border-b border-slate-100" : ""}`}
-              >
-                <div>
-                  <p className="text-[12px] text-slate-700 font-medium truncate">{p.name}</p>
-                  {p.sku && <p className="text-[10px] text-slate-400">SKU: {p.sku}</p>}
-                </div>
-                <p className="text-[12px] text-slate-500 text-right whitespace-nowrap">
-                  {p.quantity || "—"}{p.uom ? ` ${p.uom}` : ""}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </>
   );
 }
 
@@ -230,160 +135,91 @@ interface LeadCardProps {
 }
 
 export function LeadCard({ lead, onClick, variant = "pipeline" }: LeadCardProps) {
-  const { allocations } = useCRMShell();
-  const [showAllocModal, setShowAllocModal] = useState(false);
-
-  const inAllocationColumn = lead.status === "Allocation" || lead.status === "Allocation on hold";
-  const allocationRecord = lead.allocationId
-    ? allocations.find((a) => a.id === lead.allocationId) ?? null
-    : null;
-  // Non-Pending allocation outcomes: view modal allowed
-  const allocViewable = allocationRecord &&
-    (allocationRecord.status === "Approved" ||
-     allocationRecord.status === "Partially Approved" ||
-     allocationRecord.status === "On Hold" ||
-     allocationRecord.status === "Rejected");
-
-  const showAllocationActionsRow =
-    Boolean(lead.procurementStatus) || Boolean(allocationRecord && allocViewable);
-
   return (
-    <>
-      <div
-        onClick={() => onClick(lead)}
-        className="bg-white rounded-2xl border border-slate-200 cursor-pointer
-          shadow-[0_1px_4px_rgba(0,0,0,0.06)]
-          hover:shadow-[0_4px_16px_rgba(0,0,0,0.10)] hover:-translate-y-0.5
-          transition-all duration-200"
-      >
-        {/* ── Top section ── */}
-        <div className="px-4 pt-4 pb-5 space-y-3">
-
-          {/* Badge row */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {variant === "source" ? (
-              <>
-                <StageBadge status={lead.status} />
-                {lead.status !== "Inactive" && <PriorityBadge priority={lead.priority} />}
-              </>
-            ) : (
-              <>
-                <SourceBadge source={lead.leadSource} />
-                {lead.status !== "Inactive" && <PriorityBadge priority={lead.priority} />}
-              </>
-            )}
-            {inAllocationColumn && allocationRecord && (
-              <AllocationRecordVerdictBadge record={allocationRecord} />
-            )}
-            {lead.status === "Inactive" && lead.allocationRejection && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap bg-rose-50 text-rose-800 border border-rose-200">
-                Allocation rejection
-              </span>
-            )}
-          </div>
-
-          {/* Contact name */}
-          <div>
-            <h3 className="text-[15px] font-bold text-slate-900 leading-snug truncate">
-              {lead.contactName}
-            </h3>
-            <p className="text-[13px] text-slate-500 mt-0.5 truncate">
-              {lead.companyName}
-            </p>
-          </div>
-        </div>
-
-        {/* ── Divider ── */}
-        <div className="h-px bg-slate-100 mx-4" />
-
-        {/* ── Bottom row ── */}
-        <div className="px-4 py-3 flex items-start justify-between gap-2 min-w-0">
-          <div className="flex flex-col min-w-0 overflow-hidden">
-            <p className="text-[13px] font-semibold text-slate-800 truncate leading-snug">
-              {lead.assignedTo}
-            </p>
-            <p className="text-[11px] text-slate-400 leading-snug">{lead.leadRef}</p>
-          </div>
-          {lead.callDue ? (
-            <CallDue label={lead.callDue} />
+    <div
+      onClick={() => onClick(lead)}
+      className="bg-white rounded-2xl border border-slate-200 cursor-pointer
+        shadow-[0_1px_4px_rgba(0,0,0,0.06)]
+        hover:shadow-[0_4px_16px_rgba(0,0,0,0.10)] hover:-translate-y-0.5
+        transition-all duration-200"
+    >
+      <div className="px-4 pt-4 pb-5 space-y-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          {variant === "source" ? (
+            <>
+              <StageBadge status={lead.status} />
+              {lead.status !== "Inactive" && <PriorityBadge priority={lead.priority} />}
+            </>
           ) : (
-            <span className="text-[11px] text-slate-300 whitespace-nowrap flex-shrink-0">No action set</span>
+            <>
+              <SourceBadge source={lead.leadSource} />
+              {lead.status !== "Inactive" && <PriorityBadge priority={lead.priority} />}
+            </>
+          )}
+          {lead.status === "Inactive" && lead.allocationRejection && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap bg-rose-50 text-rose-800 border border-rose-200">
+              Rejection
+            </span>
           )}
         </div>
 
-        {/* ── View Products (procurement) ── */}
-        <ViewProductsSection lead={lead} />
+        <div>
+          <h3 className="text-[15px] font-bold text-slate-900 leading-snug truncate">
+            {lead.contactName}
+          </h3>
+          <p className="text-[13px] text-slate-500 mt-0.5 truncate">
+            {lead.companyName}
+          </p>
+        </div>
+      </div>
 
-        {/* ── Procurement status badge ── */}
-        {showAllocationActionsRow && (
-          <>
-            <div className="h-px bg-slate-100 mx-4" />
-            <div className="px-4 py-2.5 flex items-center justify-between gap-2">
-              {lead.procurementStatus && !allocViewable && (
-                <ProcurementBadge status={lead.procurementStatus} />
-              )}
-              {!lead.procurementStatus && <span className="min-w-0 flex-1" />}
+      <div className="h-px bg-slate-100 mx-4" />
 
-              <div className="flex items-center gap-2 flex-shrink-0 justify-end ml-auto">
-                {allocationRecord && canDownloadAllocationExport(allocationRecord.status) && (
-                  <DownloadAllocationButton record={allocationRecord} stopPropagation size="sm" />
-                )}
-                {allocViewable && (
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setShowAllocModal(true); }}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-[#002f93] border border-[#002f93]/25 hover:bg-[#002f93]/5 transition-colors"
-                  >
-                    <Eye size={11} />
-                    View Allocation
-                  </button>
-                )}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* ── Allocation rejection (inactive) ── */}
-        {lead.status === "Inactive" && lead.allocationRejection && (
-          <>
-            <div className="h-px bg-slate-100 mx-4" />
-            <div className="px-4 py-2.5 flex flex-col gap-1.5">
-              <p className="text-[12px] font-semibold text-slate-800 leading-snug">
-                {lead.allocationRejection.category}
-              </p>
-              {lead.allocationRejection.detail && (
-                <p className="text-[11px] text-slate-500 leading-snug line-clamp-3">
-                  {lead.allocationRejection.detail}
-                </p>
-              )}
-            </div>
-          </>
-        )}
-
-        {/* ── Reason tag + note (Contacted & Inactive columns only) ── */}
-        {lead.reason && (lead.status === "Contacted" || lead.status === "Inactive") && (
-          <>
-            <div className="h-px bg-slate-100 mx-4" />
-            <div className="px-4 py-2.5 flex flex-col gap-1.5">
-              <ReasonTag reason={lead.reason} />
-              {lead.reasonNote && (
-                <p className="text-[11px] text-slate-500 leading-snug line-clamp-2 pl-0.5">
-                  {lead.reasonNote}
-                </p>
-              )}
-            </div>
-          </>
+      <div className="px-4 py-3 flex items-start justify-between gap-2 min-w-0">
+        <div className="flex flex-col min-w-0 overflow-hidden">
+          <p className="text-[13px] font-semibold text-slate-800 truncate leading-snug">
+            {lead.assignedTo}
+          </p>
+          <p className="text-[11px] text-slate-400 leading-snug">{lead.leadRef}</p>
+        </div>
+        {lead.status === "Qualified" ? (
+          <QualifiedAction />
+        ) : lead.callDue ? (
+          <CallDue label={lead.callDue} />
+        ) : (
+          <span className="text-[11px] text-slate-300 whitespace-nowrap flex-shrink-0">No action set</span>
         )}
       </div>
 
-      {/* View Allocation Modal — compact (products only) when triggered from card */}
-      {showAllocModal && allocationRecord && (
-        <ViewAllocationModal
-          allocation={allocationRecord}
-          onClose={() => setShowAllocModal(false)}
-          compact
-        />
+      {lead.status === "Inactive" && lead.allocationRejection && (
+        <>
+          <div className="h-px bg-slate-100 mx-4" />
+          <div className="px-4 py-2.5 flex flex-col gap-1.5">
+            <p className="text-[12px] font-semibold text-slate-800 leading-snug">
+              {lead.allocationRejection.category}
+            </p>
+            {lead.allocationRejection.detail && (
+              <p className="text-[11px] text-slate-500 leading-snug line-clamp-3">
+                {lead.allocationRejection.detail}
+              </p>
+            )}
+          </div>
+        </>
       )}
-    </>
+
+      {lead.reason && (lead.status === "Contacted" || lead.status === "Inactive") && (
+        <>
+          <div className="h-px bg-slate-100 mx-4" />
+          <div className="px-4 py-2.5 flex flex-col gap-1.5">
+            <ReasonTag reason={lead.reason} />
+            {lead.reasonNote && (
+              <p className="text-[11px] text-slate-500 leading-snug line-clamp-2 pl-0.5">
+                {lead.reasonNote}
+              </p>
+            )}
+          </div>
+        </>
+      )}
+    </div>
   );
 }

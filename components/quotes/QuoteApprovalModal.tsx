@@ -1,10 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { X, FileSpreadsheet, Calendar, Trash2, PackageSearch } from "lucide-react";
+import { X, Calendar, Trash2 } from "lucide-react";
 import { Opportunity } from "@/lib/types";
-import { useCRMShell } from "@/components/shell/CRMShellContext";
-import { AllocationRecordDetailContent } from "@/components/leads/ViewAllocationModal";
 import {
   QuoteCommercialLogisticsShippingReadOnly,
   QuotePricingCostBreakdown,
@@ -223,18 +221,14 @@ interface QuoteApprovalModalProps {
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
 
-type QuoteModalDetailTab = "quote" | "allocation";
-
 export function QuoteApprovalModal({
   opportunity,
   onApprove,
   onCancel,
 }: QuoteApprovalModalProps) {
   const [agreed, setAgreed] = useState(false);
-  const [detailTab, setDetailTab] = useState<QuoteModalDetailTab>("quote");
   const [quoteVersionTab, setQuoteVersionTab] = useState<"current" | "old">("current");
-  const { allocations } = useCRMShell();
-  const { quoteData, procurementAllocation } = opportunity;
+  const { quoteData } = opportunity;
   if (!quoteData) return null;
 
   const oldRecord =
@@ -244,10 +238,6 @@ export function QuoteApprovalModal({
 
   const displayQuote =
     quoteVersionTab === "old" && oldRecord ? oldRecord.quoteData : quoteData;
-
-  const allocationRecord = opportunity.allocationId
-    ? allocations.find((a) => a.id === opportunity.allocationId) ?? null
-    : null;
 
   const expirationDisplay = displayQuote.validDate
     ? addDays(displayQuote.validDate, 30)
@@ -293,38 +283,8 @@ export function QuoteApprovalModal({
             </p>
           </div>
 
-          {/* Tabs */}
-          <div className="flex-shrink-0 px-6 pt-3 pb-0 border-b border-slate-100">
-            <div className="flex p-0.5 bg-slate-100 rounded-lg mb-3">
-              <button
-                type="button"
-                onClick={() => setDetailTab("quote")}
-                className={`flex-1 py-2 text-[12px] font-semibold rounded-md transition-colors ${
-                  detailTab === "quote"
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                Quote
-              </button>
-              <button
-                type="button"
-                onClick={() => setDetailTab("allocation")}
-                className={`flex-1 py-2 text-[12px] font-semibold rounded-md transition-colors ${
-                  detailTab === "allocation"
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                Allocation
-              </button>
-            </div>
-          </div>
-
           {/* Scrollable body */}
           <div className="flex-1 overflow-y-auto min-h-0 px-6 py-5 space-y-6">
-            {detailTab === "quote" && (
-              <>
             {oldRecord && (
               <div className="flex p-0.5 bg-slate-100 rounded-lg">
                 <button
@@ -414,19 +374,6 @@ export function QuoteApprovalModal({
               <SectionLabel>Commercial, Logistics &amp; Shipping</SectionLabel>
               <QuoteCommercialLogisticsShippingReadOnly q={displayQuote} />
             </section>
-
-            {/* ── Procurement File ── */}
-            {quoteVersionTab === "current" && procurementAllocation && (
-              <section>
-                <SectionLabel>Procurement File</SectionLabel>
-                <div className="flex items-center gap-2 p-3 rounded-lg border border-slate-200 bg-slate-50 w-fit">
-                  <FileSpreadsheet size={14} className="text-[#002f93] flex-shrink-0" />
-                  <span className="text-[12px] font-semibold text-[#002f93] hover:underline cursor-pointer">
-                    {procurementAllocation.fileName}
-                  </span>
-                </div>
-              </section>
-            )}
 
             {/* ── Quote Items ── */}
             <section>
@@ -537,22 +484,6 @@ export function QuoteApprovalModal({
               </label>
             </section>
               </>
-            )}
-              </>
-            )}
-
-            {detailTab === "allocation" && (
-              allocationRecord ? (
-                <AllocationRecordDetailContent allocation={allocationRecord} compact={false} />
-              ) : (
-                <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-                  <PackageSearch className="text-slate-300 mb-3" size={40} strokeWidth={1.25} />
-                  <p className="text-[13px] font-semibold text-slate-700">No allocation linked</p>
-                  <p className="text-[12px] text-slate-500 mt-2 max-w-sm leading-relaxed">
-                    There is no allocation record on this opportunity. Details from View Allocation appear here when an allocation is linked (for example from the lead allocation flow).
-                  </p>
-                </div>
-              )
             )}
           </div>
 

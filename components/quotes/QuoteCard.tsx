@@ -3,14 +3,10 @@
 import { useState } from "react";
 import {
   Calendar, DollarSign, Clock, XCircle,
-  CheckCircle2, Eye, PackageSearch, FilePenLine,
+  CheckCircle2, Eye, FilePenLine,
 } from "lucide-react";
 import { Opportunity } from "@/lib/types";
-import { useCRMShell } from "@/components/shell/CRMShellContext";
-import { canDownloadAllocationExport } from "@/lib/export-allocation-xlsx";
-import { DownloadAllocationButton } from "@/components/allocations/DownloadAllocationButton";
 import { ViewQuoteModal } from "./ViewQuoteModal";
-import { ViewAllocationModal } from "@/components/leads/ViewAllocationModal";
 import { getQuoteTableStatusLabel, QUOTE_STATUS_LABEL_APPROVED_ADJ } from "@/lib/quotes-display";
 import { isKanbanTeamAssignee } from "@/lib/quote-kanban-dnd";
 
@@ -18,15 +14,6 @@ function UrgencyBadge({ urgency }: { urgency: string }) {
   return (
     <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[12px] font-semibold whitespace-nowrap bg-white text-slate-700 border border-blue-200">
       URGENCY: {urgency.toUpperCase()}
-    </span>
-  );
-}
-
-function AllocationBadge() {
-  return (
-    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[12px] font-semibold whitespace-nowrap bg-emerald-100 text-emerald-700">
-      <CheckCircle2 size={11} className="flex-shrink-0" />
-      Allocation Approved
     </span>
   );
 }
@@ -96,17 +83,10 @@ interface QuoteCardProps {
 }
 
 export function QuoteCard({ opportunity, onClick }: QuoteCardProps) {
-  const { allocations } = useCRMShell();
   const [showQuoteModal, setShowQuoteModal] = useState(false);
-  const [showAllocModal, setShowAllocModal] = useState(false);
 
-  const { quoteData, quoteStatus, procurementAllocation: allocationData } = opportunity;
+  const { quoteData, quoteStatus } = opportunity;
   if (!quoteData) return null;
-
-  const allocationRecord = opportunity.allocationId
-    ? allocations.find((a) => a.id === opportunity.allocationId) ?? null
-    : null;
-
   const isPending = quoteStatus === "pending";
   const isRejected = quoteStatus === "rejected";
   const isApproved = quoteStatus === "approved";
@@ -182,12 +162,11 @@ export function QuoteCard({ opportunity, onClick }: QuoteCardProps) {
               {isKanbanTeamAssignee(opportunity) && (
                 <AssignedToTeamBadge name={opportunity.assignedTo} />
               )}
-              {(allocationData || allocationRecord) && <AllocationBadge />}
             </div>
 
             <div className="space-y-1">
               <h3 className="text-[14px] font-bold text-slate-900 leading-snug line-clamp-2">
-                {opportunity.opportunityName}
+                {opportunity.accountName}
               </h3>
               {quoteData.quoteId && (
                 <p className="text-[11px] font-mono font-semibold text-[#002f93]">
@@ -251,41 +230,12 @@ export function QuoteCard({ opportunity, onClick }: QuoteCardProps) {
               <Eye size={12} />
               View Quote
             </button>
-            {(allocationData || allocationRecord) && (
-              <div className="flex flex-wrap gap-2">
-                {allocationRecord && canDownloadAllocationExport(allocationRecord.status) && (
-                  <DownloadAllocationButton
-                    record={allocationRecord}
-                    stopPropagation
-                    size="sm"
-                    className="flex-1 min-w-[140px] justify-center"
-                  />
-                )}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (allocationRecord) setShowAllocModal(true);
-                  }}
-                  disabled={!allocationRecord}
-                  title={allocationRecord ? "Open allocation details" : "No linked allocation record"}
-                  className="flex-1 min-w-[140px] flex items-center justify-center gap-1.5 px-3 py-2 text-[12px] font-semibold rounded-lg border border-[#002f93]/20 text-[#002f93] hover:bg-[#002f93]/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <PackageSearch size={12} />
-                  View Allocation
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </div>
 
       {showQuoteModal && (
         <ViewQuoteModal opportunity={opportunity} onClose={() => setShowQuoteModal(false)} />
-      )}
-
-      {showAllocModal && allocationRecord && (
-        <ViewAllocationModal allocation={allocationRecord} onClose={() => setShowAllocModal(false)} />
       )}
     </>
   );

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, type MutableRefObject } from "react";
-import { buildAllocationRecord } from "@/lib/allocation-from-lead";
 import {
   DndContext,
   DragEndEvent,
@@ -12,23 +11,20 @@ import {
   useSensors,
   closestCenter,
 } from "@dnd-kit/core";
-import { Lead, KanbanColumn as KanbanColumnType, LeadStatus, Priority, OpportunityData, Opportunity, AllocationRecord } from "@/lib/types";
+import { Lead, KanbanColumn as KanbanColumnType, LeadStatus, Priority, OpportunityData, Opportunity } from "@/lib/types";
+import { persistCrmCustomerRecords, opportunityDataToPersistInput } from "@/lib/opportunity-customer-persist";
 import { KanbanColumn } from "./KanbanColumn";
 import { LeadCard } from "./LeadCard";
 import { AttemptedContactModal } from "./AttemptedContactModal";
 import { ContactedModal, ContactedModalResult } from "./ContactedModal";
-import { AllocationModal, AllocationModalResult } from "./AllocationModal";
 import { QualifiedModal } from "./QualifiedModal";
-import { BlockedModal } from "./BlockedModal";
 import { InactiveModal, InactiveModalResult } from "./InactiveModal";
 
 const COLUMNS: KanbanColumnType[] = [
   { id: "New",                 label: "New",                 accentColor: "#6366F1", emptyText: "No new leads" },
   { id: "Attempted Contact",   label: "Attempted Contact",   accentColor: "#F59E0B", emptyText: "No leads attempted contact" },
   { id: "Contacted",           label: "Contacted",           accentColor: "#10B981", emptyText: "No leads contacted" },
-  { id: "Allocation",          label: "Allocation",          accentColor: "#002f93", emptyText: "No leads in allocation" },
   { id: "Qualified",           label: "Qualified",           accentColor: "#8B5CF6", emptyText: "No leads qualified" },
-  { id: "Allocation on hold",  label: "Allocation on hold",  accentColor: "#94A3B8", emptyText: "No leads on hold" },
   { id: "Inactive",            label: "Inactive",            accentColor: "#EF4444", emptyText: "No inactive leads" },
 ];
 
@@ -49,7 +45,6 @@ interface LeadsKanbanBoardProps {
   onLeadsChange?: (leads: Lead[]) => void;
   onOpportunityCreated?: (opp: Opportunity, leadId: string) => void;
   onOpportunityUpdated?: (opp: Opportunity) => void;
-  onAllocationCreated?: (record: AllocationRecord, leadId: string) => void;
   opportunities?: Opportunity[];
   /** Filled while the sales board is mounted — used by LeadDetailPanel dropdowns */
   boardActionsRef?: MutableRefObject<LeadBoardActions | null>;
@@ -66,7 +61,6 @@ export function LeadsKanbanBoard({
   onLeadsChange,
   onOpportunityCreated,
   onOpportunityUpdated,
-  onAllocationCreated,
   opportunities = [],
   boardActionsRef,
   boardChromeHidden = false,
@@ -75,15 +69,12 @@ export function LeadsKanbanBoard({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [attemptedContactDrop, setAttemptedContactDrop] = useState<PendingDrop | null>(null);
   const [contactedDrop, setContactedDrop]       = useState<PendingDrop | null>(null);
-  const [procurementDrop, setProcurementDrop]   = useState<PendingDrop | null>(null);
   const [qualifiedDrop, setQualifiedDrop]       = useState<PendingDrop | null>(null);
   const [inactiveDrop,  setInactiveDrop]        = useState<PendingDrop | null>(null);
-  const [showProcurementBlock, setShowProcurementBlock] = useState(false);
 
   const activeLead        = leads.find((l) => l.id === activeId) ?? null;
   const attemptedLead     = attemptedContactDrop ? leads.find((l) => l.id === attemptedContactDrop.leadId) ?? null : null;
   const contactedLead     = contactedDrop        ? leads.find((l) => l.id === contactedDrop.leadId)        ?? null : null;
-  const procurementLead   = procurementDrop      ? leads.find((l) => l.id === procurementDrop.leadId)      ?? null : null;
   const qualifiedLead     = qualifiedDrop        ? leads.find((l) => l.id === qualifiedDrop.leadId)        ?? null : null;
   const inactiveLead      = inactiveDrop         ? leads.find((l) => l.id === inactiveDrop.leadId)         ?? null : null;
 
@@ -107,15 +98,7 @@ export function LeadsKanbanBoard({
       setContactedDrop({ leadId, targetStatus: targetColumn });
       return;
     }
-    if (targetColumn === "Allocation") {
-      setProcurementDrop({ leadId, targetStatus: targetColumn });
-      return;
-    }
     if (targetColumn === "Qualified") {
-      if (lead.procurementStatus !== "approved") {
-        setShowProcurementBlock(true);
-        return;
-      }
       setQualifiedDrop({ leadId, targetStatus: targetColumn });
       return;
     }
@@ -152,14 +135,6 @@ export function LeadsKanbanBoard({
     onLeadsChange?.(next);
   }
 
-  // ── Shared helper: build AllocationRecord and fire the callback ──────────────
-  function buildAndFireAllocation(lead: Lead, modalResult: AllocationModalResult) {
-    if (!onAllocationCreated) return null;
-    const record = buildAllocationRecord(lead, modalResult);
-    onAllocationCreated(record, lead.id);
-    return record.id;
-  }
-
   function handleAttemptedSave(dueDate: string) {
     if (!attemptedContactDrop) return;
     applyStatus(attemptedContactDrop.leadId, "Attempted Contact", {
@@ -180,14 +155,6 @@ export function LeadsKanbanBoard({
     setContactedDrop(null);
   }
 
-  /** Reuses the same AllocationModal + handleAllocationSave path as dragging to the Allocation column */
-  function handleStartAllocationFromContacted() {
-    if (!contactedDrop) return;
-    const { leadId } = contactedDrop;
-    setContactedDrop(null);
-    setProcurementDrop({ leadId, targetStatus: "Allocation" });
-  }
-
   function handleInactiveSave(result: InactiveModalResult) {
     if (!inactiveDrop) return;
     applyStatus(inactiveDrop.leadId, "Inactive", {
@@ -203,16 +170,18 @@ export function LeadsKanbanBoard({
     const lead = leads.find((l) => l.id === qualifiedDrop.leadId);
     if (!lead) return;
 
+    const idMerge = persistCrmCustomerRecords(opportunityDataToPersistInput(data));
+    const dataSynced: OpportunityData = { ...data, ...idMerge };
+
     applyStatus(qualifiedDrop.leadId, "Qualified", {
-      opportunityData: data,
-      callDue: `Follow-up due ${fmt(data.followUpDate)}`,
-      priority: data.leadPriority,
+      opportunityData: dataSynced,
+      callDue: "Qualified",
+      priority: dataSynced.leadPriority,
     });
 
     const today = new Date();
     const createdDate = `${String(today.getMonth() + 1).padStart(2, "0")}/${String(today.getDate()).padStart(2, "0")}/${String(today.getFullYear()).slice(2)} ; ${String(today.getHours()).padStart(2, "0")}:${String(today.getMinutes()).padStart(2, "0")}`;
 
-    // Check if this lead already has a linked opportunity — update it instead of creating a new one
     const existingOpp = lead.opportunityId
       ? opportunities.find((o) => o.id === lead.opportunityId)
       : null;
@@ -220,44 +189,61 @@ export function LeadsKanbanBoard({
     if (existingOpp && onOpportunityUpdated) {
       const updatedOpp: Opportunity = {
         ...existingOpp,
-        opportunityName:  data.opportunityName,
-        accountName:      data.accountName,
-        businessType:     data.businessType,
-        closingDate:      data.closingDate,
-        contactName:      data.contactName,
-        pipeline:         data.pipeline,
-        expectedRevenue:  data.expectedRevenue,
-        amount:           data.amount,
-        campaignSource:   data.campaignSource,
-        description:      data.description,
-        leadPriority:     data.leadPriority,
+        accountName:      dataSynced.accountName,
+        businessType:     dataSynced.businessType,
+        closingDate:      dataSynced.closingDate,
+        contactName:      dataSynced.contactName,
+        contactEmail:     dataSynced.contactEmail ?? existingOpp.contactEmail,
+        contactPhone:     dataSynced.contactPhone ?? existingOpp.contactPhone,
+        pipeline:         dataSynced.pipeline,
+        expectedRevenue:  dataSynced.expectedRevenue,
+        amount:           dataSynced.amount,
+        campaignSource:   dataSynced.campaignSource,
+        description:      dataSynced.description,
+        leadPriority:     dataSynced.leadPriority,
+        companyName:      dataSynced.accountName,
+        customerType:     dataSynced.customerType,
+        linkedAccountId:  dataSynced.linkedAccountId,
+        linkedContactId:  dataSynced.linkedContactId,
+        accountWebsite:   dataSynced.accountWebsite,
+        accountIndustry:  dataSynced.accountIndustry,
+        contactFirstName: dataSynced.contactFirstName,
+        contactLastName:  dataSynced.contactLastName,
+        contactGender:    dataSynced.contactGender,
       };
       onOpportunityUpdated(updatedOpp);
     } else if (onOpportunityCreated) {
       const newOpp: Opportunity = {
         id: `opp-${Date.now()}`,
         opportunityRef: `O-${10100 + Math.floor(Math.random() * 900)}`,
-        opportunityName:  data.opportunityName,
-        accountName:      data.accountName,
-        businessType:     data.businessType,
-        closingDate:      data.closingDate,
-        contactName:      data.contactName,
-        contactEmail:     lead.email,
-        contactPhone:     lead.phone,
-        pipeline:         data.pipeline,
-        expectedRevenue:  data.expectedRevenue,
-        amount:           data.amount,
-        campaignSource:   data.campaignSource,
-        description:      data.description,
+        accountName:      dataSynced.accountName,
+        businessType:     dataSynced.businessType,
+        closingDate:      dataSynced.closingDate,
+        contactName:      dataSynced.contactName,
+        contactEmail:     dataSynced.contactEmail ?? lead.email,
+        contactPhone:     dataSynced.contactPhone ?? lead.phone,
+        pipeline:         dataSynced.pipeline,
+        expectedRevenue:  dataSynced.expectedRevenue,
+        amount:           dataSynced.amount,
+        campaignSource:   dataSynced.campaignSource,
+        description:      dataSynced.description,
         note:             lead.note,
         leadSource:       lead.leadSource,
         createdDate,
-        leadPriority:     data.leadPriority,
+        leadPriority:     dataSynced.leadPriority,
         opportunityStage: "Qualified",
         assignedTo:       lead.opportunityOwner,
-        companyName:      lead.companyName,
+        companyName:      dataSynced.accountName,
         leadId:           lead.id,
         allocationId:     lead.allocationId,
+        customerType:     dataSynced.customerType,
+        linkedAccountId:  dataSynced.linkedAccountId,
+        linkedContactId:  dataSynced.linkedContactId,
+        accountWebsite:   dataSynced.accountWebsite,
+        accountIndustry:  dataSynced.accountIndustry,
+        contactFirstName: dataSynced.contactFirstName,
+        contactLastName:  dataSynced.contactLastName,
+        contactGender:    dataSynced.contactGender,
         activities: [
           {
             id:          `oact-${Date.now()}`,
@@ -273,21 +259,6 @@ export function LeadsKanbanBoard({
     }
 
     setQualifiedDrop(null);
-  }
-
-  function handleAllocationSave(result: AllocationModalResult, leadForSave: Lead) {
-    if (!procurementDrop || !procurementLead) return;
-
-    const allocId = buildAndFireAllocation(leadForSave, result);
-
-    applyStatus(procurementDrop.leadId, "Allocation", {
-      procurementStatus:   "checking",
-      callDue:             `Follow-up due ${fmt(result.dueDate)}`,
-      procurementProducts: result.products,
-      allocationId:        allocId ?? undefined,
-    });
-
-    setProcurementDrop(null);
   }
 
   if (boardActionsRef) {
@@ -349,23 +320,26 @@ export function LeadsKanbanBoard({
           leadName={contactedLead.contactName}
           onSave={handleContactedSave}
           onCancel={() => setContactedDrop(null)}
-          onStartAllocation={handleStartAllocationFromContacted}
-        />
-      )}
-
-      {procurementDrop && procurementLead && (
-        <AllocationModal
-          lead={procurementLead}
-          onSave={handleAllocationSave}
-          onCancel={() => setProcurementDrop(null)}
         />
       )}
 
       {qualifiedDrop && qualifiedLead && (
         <QualifiedModal
+          key={qualifiedLead.id}
           leadName={qualifiedLead.contactName}
           defaultContactName={qualifiedLead.contactName}
           defaultAccountName={qualifiedLead.companyName}
+          leadPrefill={{
+            companyName: qualifiedLead.companyName,
+            website: qualifiedLead.website,
+            industry: qualifiedLead.industry,
+            expectedRevenue: qualifiedLead.expectedRevenue,
+            firstName: qualifiedLead.firstName,
+            lastName: qualifiedLead.lastName,
+            email: qualifiedLead.email,
+            mobile: qualifiedLead.phone,
+            gender: qualifiedLead.gender,
+          }}
           onSave={handleQualifiedSave}
           onCancel={() => setQualifiedDrop(null)}
         />
@@ -376,14 +350,6 @@ export function LeadsKanbanBoard({
           leadName={inactiveLead.contactName}
           onSave={handleInactiveSave}
           onCancel={() => setInactiveDrop(null)}
-        />
-      )}
-
-      {showProcurementBlock && (
-        <BlockedModal
-          title="Allocation Approval Required"
-          message="This lead must be approved by the Allocation team before it can be moved to the Qualified stage. Please wait for allocation approval first."
-          onClose={() => setShowProcurementBlock(false)}
         />
       )}
     </>

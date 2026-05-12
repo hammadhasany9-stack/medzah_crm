@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { TenantLink } from "@/components/providers/TenantLink";
 import { useTenant } from "@/components/providers/TenantProvider";
 import {
@@ -219,7 +219,7 @@ const APPROVAL_TABS: { id: ApprovalTab; label: string }[] = [
 
 export default function CustomerIntakeApprovalPage() {
   const { tenant } = useTenant();
-  const [records, setRecords] = useState<CustomerIntakeRecord[]>([]);
+  const [records, setRecords] = useState<CustomerIntakeRecord[]>(() => loadCustomerIntakes());
   const [search, setSearch] = useState("");
   const [ownerFilter, setOwnerFilter] = useState("");
   const [dateRange, setDateRange] = useState<DateRange>({ start: null, end: null });
@@ -229,10 +229,6 @@ export default function CustomerIntakeApprovalPage() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-
-  useEffect(() => {
-    setRecords(loadCustomerIntakes());
-  }, []);
 
   function refresh() {
     setRecords(loadCustomerIntakes());
@@ -488,7 +484,7 @@ export default function CustomerIntakeApprovalPage() {
                 <th className={thCls("customerName")} onClick={() => handleSort("customerName")}>
                   <span className="flex items-center gap-2">
                     <span className="flex items-center gap-1.5">
-                      Customer Name{" "}
+                      Account name{" "}
                       <SortIcon field="customerName" sortField={sortField} sortDir={sortDir} />
                     </span>
                     <span
